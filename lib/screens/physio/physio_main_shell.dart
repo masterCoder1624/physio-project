@@ -59,9 +59,9 @@ class _PhysioMainShellState extends State<PhysioMainShell> {
         },
         children: const [
           PhysioDashboard(embedded: true),
-          PatientListScreen(),
+          PatientListScreen(showBottomNavigation: false),
           CalendarScreen(),
-          ProfileScreen(),
+          ProfileScreen(showBottomNavigation: false),
         ],
       ),
       bottomNavigationBar: NavigationBar(

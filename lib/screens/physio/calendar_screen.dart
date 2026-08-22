@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'patient_list_screen.dart';
-import 'profile_screen.dart';
 
 const Color _cyan = Color(0xFF08A9BE);
 const Color _cyanDark = Color(0xFF078EA1);
@@ -92,7 +90,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
           ],
         ),
-        bottomNavigationBar: _buildBottomNavigation(),
       ),
     );
   }
@@ -345,43 +342,55 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ],
                 ),
               ),
-              PopupMenuButton<String>(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                icon: const Icon(Icons.more_vert, color: _muted, size: 21),
+              SizedBox(
+                width: 30,
+                height: 40,
+                child: PopupMenuButton<String>(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                  icon: const Icon(Icons.more_vert, color: _muted, size: 21),
                 onSelected: (value) => _showAppointmentAction(value, appointment),
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'details', child: Text('View details')),
-                  PopupMenuItem(value: 'patient', child: Text('View patient')),
-                ],
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'details', child: Text('View details')),
+                    PopupMenuItem(value: 'patient', child: Text('View patient')),
+                  ],
+                ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-                decoration: BoxDecoration(color: appointment.statusBg, borderRadius: BorderRadius.circular(10)),
-                child: Text(appointment.status, style: TextStyle(color: appointment.statusColor, fontSize: 11.5, fontWeight: FontWeight.w800)),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: () => _showAppointmentAction('patient', appointment),
-                icon: const Icon(Icons.arrow_forward, size: 15),
-                label: const Text('View Patient'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _cyanDark,
-                  side: const BorderSide(color: _cyan),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
-                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-                  minimumSize: const Size(0, 36),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                  decoration: BoxDecoration(color: appointment.statusBg, borderRadius: BorderRadius.circular(10)),
+                  child: Text(
+                    appointment.status,
+                    style: TextStyle(color: appointment.statusColor, fontSize: 11.5, fontWeight: FontWeight.w800),
+                  ),
                 ),
-              ),
-            ],
+                OutlinedButton.icon(
+                  onPressed: () => _showAppointmentAction('patient', appointment),
+                  icon: const Icon(Icons.arrow_forward, size: 15),
+                  label: const Text('View Patient'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _cyanDark,
+                    side: const BorderSide(color: _cyan),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                    minimumSize: const Size(0, 36),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -418,52 +427,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ],
         ),
       );
-
-  Widget _buildBottomNavigation() {
-    final items = [
-      (Icons.home_outlined, 'Home'),
-      (Icons.people_outline, 'Patients'),
-      (Icons.calendar_month_outlined, 'Calendar'),
-      (Icons.person_outline, 'Profile'),
-    ];
-
-    return SafeArea(
-      top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: _border))),
-        child: Row(
-          children: List.generate(items.length, (index) {
-            final selected = index == 2;
-            return Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: () {
-                  if (index == 0) Navigator.of(context).pop();
-                  if (index == 1) Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const PatientListScreen()));
-                  if (index == 3) Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const ProfileScreen()));
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  padding: const EdgeInsets.symmetric(vertical: 7),
-                  decoration: BoxDecoration(color: selected ? _cyanLight : Colors.transparent, borderRadius: BorderRadius.circular(14)),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(items[index].$1, color: selected ? _cyanDark : _muted, size: 22),
-                      const SizedBox(height: 3),
-                      Text(items[index].$2, style: TextStyle(color: selected ? _cyanDark : _muted, fontSize: 11, fontWeight: selected ? FontWeight.w800 : FontWeight.w600)),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
-        ),
-      ),
-    );
-  }
 
   BoxDecoration _cardDecoration({double radius = 20}) => BoxDecoration(
         color: Colors.white,
