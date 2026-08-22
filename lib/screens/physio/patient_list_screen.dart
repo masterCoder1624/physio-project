@@ -5,6 +5,8 @@ import 'calendar_screen.dart';
 import 'patient_detail_screen.dart';
 import 'physio_dashboard.dart';
 import 'profile_screen.dart';
+import 'physio_navigation.dart';
+import 'dart:async';
 
 // Physio Patients UI theme. Backend/API code is intentionally untouched.
 const Color _kPrimaryCyan = Color(0xFF00AFC1);
@@ -18,7 +20,9 @@ const Color _kTextMuted = Color(0xFF94A3B8);
 const Color _kBorderColor = Color(0xFFE5EEF2);
 
 class PatientListScreen extends StatefulWidget {
-  const PatientListScreen({super.key});
+  const PatientListScreen({super.key, this.showBottomNavigation = true});
+
+  final bool showBottomNavigation;
 
   @override
   State<PatientListScreen> createState() => _PatientListScreenState();
@@ -34,6 +38,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
   String _selectedFilter = 'All';
   String _sortBy = 'Default';
   int _navIndex = 1;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -47,6 +52,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
     _searchController
       ..removeListener(_onSearchChanged)
       ..dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -165,9 +171,12 @@ class _PatientListScreenState extends State<PatientListScreen> {
   }
 
   void _onSearchChanged() {
-    if (!mounted) return;
-    setState(() {
-      _filteredPatients = _filterPatients(_allPatients);
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 160), () {
+      if (!mounted) return;
+      setState(() {
+        _filteredPatients = _filterPatients(_allPatients);
+      });
     });
   }
 
@@ -238,7 +247,10 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PhysioSystemUi(
+      statusBarColor: Colors.white,
+      statusBarBrightness: Brightness.light,
+      child: Scaffold(
       backgroundColor: _kPageBg,
       body: SafeArea(
         child: RefreshIndicator(
@@ -291,7 +303,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
+      bottomNavigationBar: widget.showBottomNavigation ? _buildBottomNavigationBar() : null,
       floatingActionButton: FloatingActionButton(
         onPressed: _openAddPatient,
         backgroundColor: _kPrimaryCyan,
@@ -299,6 +311,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
         elevation: 4,
         child: const Icon(Icons.add_rounded, size: 28),
       ),
+    ),
     );
   }
 
@@ -1019,15 +1032,11 @@ class _PatientListScreenState extends State<PatientListScreen> {
             _buildNavItem(Icons.home_outlined, 'Home', 0, _returnToDashboard),
             _buildNavItem(Icons.people_outline, 'Patients', 1, () {}),
             _buildNavItem(Icons.calendar_today_outlined, 'Calendar', 2, () {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const CalendarScreen()),
-              );
+              PhysioNavigation.replace(context, const CalendarScreen());
             }),
             _buildNavItem(Icons.trending_up, 'Analytics', 3, () {}),
             _buildNavItem(Icons.person_outline, 'Profile', 4, () {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const ProfileScreen()),
-              );
+              PhysioNavigation.replace(context, const ProfileScreen());
             }),
           ],
         ),
@@ -1082,30 +1091,19 @@ class _PatientListScreenState extends State<PatientListScreen> {
   }
 
   void _openPatient(String patientId, int tabIndex) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => PatientDetailScreen(
-          patientId: patientId,
-          initialTabIndex: tabIndex,
-        ),
-      ),
-    );
+    PhysioNavigation.push(context, PatientDetailScreen(patientId: patientId, initialTabIndex: tabIndex));
   }
 
   void _returnToDashboard() {
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const PhysioDashboard()),
-      );
+      PhysioNavigation.replace(context, const PhysioDashboard());
     }
   }
 
   Future<void> _openAddPatient() async {
-    final patientWasAdded = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const AddPatientScreen()),
-    );
+    final patientWasAdded = await PhysioNavigation.push<bool>(context, const AddPatientScreen());
     if (patientWasAdded == true) _fetchPatients();
   }
 }

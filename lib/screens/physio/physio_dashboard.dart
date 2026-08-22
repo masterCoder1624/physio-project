@@ -6,6 +6,8 @@ import 'calendar_screen.dart';
 import 'patient_detail_screen.dart';
 import 'patient_list_screen.dart';
 import 'profile_screen.dart';
+import 'physio_navigation.dart';
+import 'physio_main_shell.dart';
 import '../auth/login_screen.dart';
 
 // Physio frontend theme — keep backend/API files untouched.
@@ -27,7 +29,9 @@ const Color kPrimaryTeal = kDarkCyan;
 const Color kCoral = Color(0xFFFF6B4A);
 
 class PhysioDashboard extends StatefulWidget {
-  const PhysioDashboard({super.key});
+  const PhysioDashboard({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   State<PhysioDashboard> createState() => _PhysioDashboardState();
@@ -61,8 +65,11 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
     });
 
     try {
-      final user = await AuthService().getProfile();
-      final patientModels = await PatientService().getPatients();
+      // Start both reads together so the dashboard does not wait for them one-by-one.
+      final userFuture = AuthService().getProfile();
+      final patientsFuture = PatientService().getPatients();
+      final user = await userFuture;
+      final patientModels = await patientsFuture;
 
       final dashboardPatients = patientModels.map((p) {
         return DashboardPatient(
@@ -97,15 +104,19 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
   Future<void> _signOut() async {
     await AuthService().logout();
     if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
+    await PhysioNavigation.pushAndClear(context, const LoginScreen());
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    if (!widget.embedded) {
+      return const PhysioMainShell();
+    }
+
+    return PhysioSystemUi(
+      statusBarColor: kDarkCyan,
+      statusBarBrightness: Brightness.dark,
+      child: Scaffold(
       backgroundColor: kPageBackground,
       body: SafeArea(
         bottom: false,
@@ -140,7 +151,8 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
         child: const Icon(Icons.add, size: 28),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      bottomNavigationBar: _buildBottomNavigationBar(),
+      bottomNavigationBar: widget.embedded ? null : _buildBottomNavigationBar(),
+    ),
     );
   }
 
@@ -738,32 +750,34 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
   }
 
   void _onNavigationTapped(int index) {
-    setState(() => _selectedIndex = index);
-
-    switch (index) {
-      case 1:
-        _navigateTo(const PatientListScreen());
-        break;
-      case 2:
-        _navigateTo(const CalendarScreen());
-        break;
-      case 4:
-        _navigateTo(const ProfileScreen());
-        break;
-      default:
-        break;
+    if (index == 0) {
+      setState(() => _selectedIndex = 0);
+      return;
     }
+
+    final Widget? page = switch (index) {
+      1 => const PatientListScreen(),
+      2 => const CalendarScreen(),
+      4 => const ProfileScreen(),
+      _ => null,
+    };
+
+    if (page == null) {
+      setState(() => _selectedIndex = index);
+      return;
+    }
+
+    setState(() => _selectedIndex = index);
+    PhysioNavigation.replace(context, page);
   }
 
   void _navigateTo(Widget screen) async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+    await PhysioNavigation.push(context, screen);
     if (mounted) setState(() => _selectedIndex = 0);
   }
 
   Future<void> _openAddPatient() async {
-    final patientWasAdded = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const AddPatientScreen()),
-    );
+    final patientWasAdded = await PhysioNavigation.push<bool>(context, const AddPatientScreen());
     if (patientWasAdded == true) await _refreshDashboard();
   }
 
