@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../models/exercise_model.dart';
+import '../../constants/patient_theme.dart';
+import 'exercise_detail_screen.dart';
+import 'patient_components.dart';
 
-const Color _primaryBlue = Color(0xFF0066CC);
-const Color _textPrimary = Color(0xFF2C3E50);
-const Color _textSecondary = Color(0xFF7F8C8D);
-const Color _pageBackground = Color(0xFFF8FAFB);
-const Color _cardBackground = Color(0xFFFFFFFF);
-const Color _border = Color(0xFFE1E8ED);
-
+/// Screen 8 — Today's Plan / Exercise List Screen (matching media_1787385006975.jpg)
 class ExerciseListScreen extends StatefulWidget {
   const ExerciseListScreen({super.key});
 
@@ -16,128 +12,318 @@ class ExerciseListScreen extends StatefulWidget {
 }
 
 class _ExerciseListScreenState extends State<ExerciseListScreen> {
-  final List<ExerciseModel> _exercises = const [
-    ExerciseModel(
-      id: 'ex-1',
-      categoryId: 'cat-knee',
-      title: 'Quadriceps Setting',
-      description: 'Isometrics for quadriceps strengthening',
-      bodyPart: 'Knee',
-      difficulty: 'Beginner',
-      instructions: 'Press knee downwards into towel roll. Hold for 5 seconds.',
-      sets: 3,
-      reps: 10,
-    ),
-    ExerciseModel(
-      id: 'ex-2',
-      categoryId: 'cat-knee',
-      title: 'Straight Leg Raise (SLR)',
-      description: 'Hip flexor and quadriceps strength builder',
-      bodyPart: 'Knee & Hip',
-      difficulty: 'Intermediate',
-      instructions: 'Keep leg straight and lift 45 degrees off the bed. Lower slowly.',
-      sets: 3,
-      reps: 12,
-    ),
-    ExerciseModel(
-      id: 'ex-3',
-      categoryId: 'cat-ankle',
-      title: 'Ankle Pumps',
-      description: 'Circulation and calf mobility exercise',
-      bodyPart: 'Ankle',
-      difficulty: 'Beginner',
-      instructions: 'Point toes down and flex back towards knees.',
-      sets: 4,
-      reps: 15,
-    ),
+  int _selectedTabIndex = 0; // 0: Today, 1: Upcoming, 2: Completed
+
+  final List<Map<String, dynamic>> _exercises = [
+    {
+      'name': 'Bridge Exercise',
+      'target': 'Glutes • Lower Body',
+      'sets': '3',
+      'reps': '12',
+      'duration': '10 min',
+      'isCompleted': true,
+      'icon': Icons.accessibility_new_rounded,
+    },
+    {
+      'name': 'Wall Squat',
+      'target': 'Quadriceps • Knee Stability',
+      'sets': '3',
+      'reps': '15',
+      'duration': '15 min',
+      'isCompleted': true,
+      'icon': Icons.fitness_center_rounded,
+    },
+    {
+      'name': 'Leg Raise',
+      'target': 'Hip Flexors • Core',
+      'sets': '3',
+      'reps': '12',
+      'duration': '10 min',
+      'isCompleted': false,
+      'icon': Icons.airline_seat_legroom_extra_rounded,
+    },
+    {
+      'name': 'Hamstring Stretch',
+      'target': 'Hamstrings • Flexibility',
+      'sets': '3',
+      'reps': '30 sec',
+      'duration': '5 min',
+      'isCompleted': false,
+      'icon': Icons.self_improvement_rounded,
+    },
+    {
+      'name': 'Calf Raises',
+      'target': 'Calves • Ankle Stability',
+      'sets': '3',
+      'reps': '15',
+      'duration': '8 min',
+      'isCompleted': false,
+      'icon': Icons.directions_walk_rounded,
+    },
+    {
+      'name': 'Ankle Circles',
+      'target': 'Ankle Mobility',
+      'sets': '2',
+      'reps': '20',
+      'duration': '5 min',
+      'isCompleted': true,
+      'icon': Icons.rotate_right_rounded,
+    },
   ];
+
+  List<Map<String, dynamic>> get _filteredExercises {
+    if (_selectedTabIndex == 1) {
+      return _exercises.where((e) => !(e['isCompleted'] as bool)).toList();
+    } else if (_selectedTabIndex == 2) {
+      return _exercises.where((e) => e['isCompleted'] as bool).toList();
+    }
+    return _exercises;
+  }
+
+  void _openExercise(int index) async {
+    final ex = _filteredExercises[index];
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ExerciseDetailScreen(
+          exerciseName: ex['name'] as String,
+          targetArea: ex['target'] as String,
+          sets: ex['sets'] as String,
+          reps: ex['reps'] as String,
+          duration: ex['duration'] as String,
+          isInitiallyCompleted: ex['isCompleted'] as bool,
+        ),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        ex['isCompleted'] = result;
+      });
+    }
+  }
+
+  void _startNextExercise() {
+    final nextPending = _exercises.firstWhere(
+      (e) => !(e['isCompleted'] as bool),
+      orElse: () => _exercises.first,
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ExerciseDetailScreen(
+          exerciseName: nextPending['name'] as String,
+          targetArea: nextPending['target'] as String,
+          sets: nextPending['sets'] as String,
+          reps: nextPending['reps'] as String,
+          duration: nextPending['duration'] as String,
+          isInitiallyCompleted: nextPending['isCompleted'] as bool,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final completedCount = _exercises.where((e) => e['isCompleted'] as bool).length;
+    final totalCount = _exercises.length;
+
     return Scaffold(
-      backgroundColor: _pageBackground,
+      backgroundColor: PatientTheme.pageBg,
       appBar: AppBar(
-        title: const Text('Prescribed Exercises'),
-        backgroundColor: _primaryBlue,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: PatientTheme.textDark),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: const Text(
+          'Today\'s Plan',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: PatientTheme.textDark),
+        ),
+        centerTitle: true,
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: _exercises.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final ex = _exercises[index];
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: _cardBackground,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _border),
-            ),
+      body: Column(
+        children: [
+          // Header Summary Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+            color: Colors.white,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      ex.title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: _textPrimary,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Today\'s Exercises',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: PatientTheme.textDark,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Complete your exercises for today',
+                          style: TextStyle(fontSize: 12, color: PatientTheme.textSecondary),
+                        ),
+                      ],
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: _primaryBlue.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
+                        color: PatientTheme.primaryTealLight,
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        ex.difficulty,
+                        '$completedCount / $totalCount Done',
                         style: const TextStyle(
                           fontSize: 12,
-                          color: _primaryBlue,
                           fontWeight: FontWeight.bold,
+                          color: PatientTheme.primaryTeal,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  ex.description,
-                  style: const TextStyle(color: _textSecondary, fontSize: 13),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Chip(
-                      label: Text('${ex.sets} Sets'),
-                      backgroundColor: _pageBackground,
-                    ),
-                    const SizedBox(width: 8),
-                    Chip(
-                      label: Text('${ex.reps} Reps'),
-                      backgroundColor: _pageBackground,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Instructions: ${ex.instructions}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                    color: _textSecondary,
+                const SizedBox(height: 14),
+
+                // Filter Tabs (Today, Upcoming, Completed)
+                Container(
+                  height: 38,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: PatientTheme.inputBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      _buildTabItem(0, 'All (${_exercises.length})'),
+                      _buildTabItem(1, 'Upcoming (${totalCount - completedCount})'),
+                      _buildTabItem(2, 'Completed ($completedCount)'),
+                    ],
                   ),
                 ),
               ],
             ),
-          );
-        },
+          ),
+
+          // Exercise List
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+              itemCount: _filteredExercises.length,
+              itemBuilder: (context, index) {
+                final ex = _filteredExercises[index];
+                final isDone = ex['isCompleted'] as bool;
+
+                return PatientCard(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(14),
+                  onTap: () => _openExercise(index),
+                  child: Row(
+                    children: [
+                      // Thumbnail Icon Box
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: isDone ? PatientTheme.successGreenBg : PatientTheme.primaryTealLight,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          ex['icon'] as IconData,
+                          color: isDone ? PatientTheme.successGreen : PatientTheme.primaryTeal,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+
+                      // Details
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ex['name'] as String,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: PatientTheme.textDark,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${ex['sets']} sets • ${ex['reps']} reps • ${ex['duration']}',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: PatientTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Status Badge
+                      StatusBadge(
+                        label: isDone ? 'Completed' : 'Pending',
+                        isCompleted: isDone,
+                        isPending: !isDone,
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: PatientTheme.textMuted),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+      bottomSheet: Container(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+        color: Colors.white,
+        child: PrimaryTealButton(
+          label: 'Start Next Exercise',
+          icon: Icons.play_arrow_rounded,
+          onPressed: _startNextExercise,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabItem(int index, String label) {
+    final isSelected = _selectedTabIndex == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTabIndex = index),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected ? PatientTheme.primaryTeal : PatientTheme.textSecondary,
+            ),
+          ),
+        ),
       ),
     );
   }
