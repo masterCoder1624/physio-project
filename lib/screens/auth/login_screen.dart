@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
-import '../patient/add_patient_screen.dart';
+import '../physio/physio_main_shell.dart';
 import '../patient/patient_dashboard.dart';
 import 'signup_screen.dart';
 
@@ -49,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final isPhysioUser = user.role.contains('physio') || _isPhysio;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (_) => isPhysioUser ? const AddPatientScreen(isFirstTimeLogin: true) : const PatientDashboard(),
+          builder: (_) => isPhysioUser ? const PhysioMainShell() : const PatientDashboard(),
         ),
         (route) => false,
       );

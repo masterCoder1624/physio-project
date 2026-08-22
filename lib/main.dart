@@ -4,16 +4,20 @@ import 'package:flutter/services.dart';
 
 import 'constants/app_colors.dart';
 import 'firebase_options.dart';
-import 'screens/onboarding/welcome_screen.dart';
+import 'screens/common/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
+  // Start Firebase initialization without blocking Flutter startup.
+  final firebaseReady = Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  await SystemChrome.setEnabledSystemUIMode(
+    SystemUiMode.edgeToEdge,
+  );
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -24,17 +28,25 @@ Future<void> main() async {
     ),
   );
 
-  runApp(const MyApp());
+  // Flutter can now render the splash immediately.
+  runApp(
+    MyApp(firebaseReady: firebaseReady),
+  );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Future<FirebaseApp> firebaseReady;
+
+  const MyApp({
+    super.key,
+    required this.firebaseReady,
+  });
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'PhysioVerse',
+      title: 'PhysioSoft',
       theme: ThemeData(
         brightness: Brightness.light,
         scaffoldBackgroundColor: AppColors.pageBackground,
@@ -46,7 +58,10 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const WelcomeScreen(),
+
+      home: SplashScreen(
+        firebaseReady: firebaseReady,
+      ),
     );
   }
 }

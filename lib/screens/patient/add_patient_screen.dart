@@ -5,13 +5,16 @@ import '../../services/patient_service.dart';
 import '../../services/pdf_invoice_service.dart';
 import '../physio/physio_dashboard.dart';
 
-const Color _kPageBg = Color(0xFF0D1F17);       // Deep Dark Forest
-const Color _kCardBg = Color(0xFF132A1F);       // Dark Forest Card BG
-const Color _kBorder = Color(0xFF254B37);       // Dark Forest Border
-const Color _kMint = Color(0xFF56C596);         // Mint Accent / Selected Button
-const Color _kTextPrimary = Color(0xFFF8FAFC);   // White Text
-const Color _kTextSecondary = Color(0xFFA7F3D0); // Mint Secondary Text
-const Color _kTextMuted = Color(0xFF6EE7B7);     // Muted Text
+const Color _kPageBg = Color(0xFFF4F9FA);
+const Color _kCardBg = Colors.white;
+const Color _kBorder = Color(0xFFD9E7EA);
+const Color _kMint = Color(0xFF08A7B5);
+const Color _kTextPrimary = Color(0xFF102A43);
+const Color _kTextSecondary = Color(0xFF5F7185);
+const Color _kTextMuted = Color(0xFF8A9AAA);
+const Color _kSuccess = Color(0xFF16A36A);
+const Color _kWarning = Color(0xFFF2A900);
+const Color _kDanger = Color(0xFFE85D68);
 
 class AddPatientScreen extends StatefulWidget {
   const AddPatientScreen({super.key, this.isFirstTimeLogin = false});
@@ -228,8 +231,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       key: const ValueKey('Step1'),
       children: [
         _buildHeader(
-          title: 'Add New Patient',
-          subtitle: 'Step 1 of 3: Details',
+          title: 'Add Patient',
+          subtitle: 'Patient information',
           stepDots: 1,
           onBack: () {
             if (Navigator.of(context).canPop()) {
@@ -241,630 +244,291 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
         ),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Let's get your patient's details",
-                    style: TextStyle(
-                      color: _kTextSecondary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  _buildSectionIntro(
+                    icon: Icons.person_outline_rounded,
+                    title: 'Patient Information',
+                    subtitle: "Let's add some basic information",
                   ),
                   const SizedBox(height: 16),
-
-                  // Upload Patient Photo Card
                   _buildPhotoUploadCard(),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 22),
 
-                  // Full Name Field
-                  _buildLabel('Full Name'),
-                  const SizedBox(height: 6),
+                  _buildLabel('Full Name', required: true, icon: Icons.person_outline_rounded),
+                  const SizedBox(height: 7),
                   _buildTextField(
                     controller: _nameController,
                     hint: 'Enter patient full name',
+                    prefixIcon: Icons.person_outline_rounded,
                     validator: (val) =>
                         (val == null || val.trim().isEmpty) ? 'Please enter full name' : null,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
 
-                  // Gender Selection Pills
-                  _buildLabel('Gender'),
+                  _buildLabel('Gender', required: true, icon: Icons.wc_rounded),
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       _buildGenderPill('Male'),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       _buildGenderPill('Female'),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       _buildGenderPill('Other'),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
 
-                  // Phone Number Field
-                  _buildLabel('Contact Number'),
-                  const SizedBox(height: 6),
+                  _buildLabel('Contact Number', icon: Icons.phone_outlined),
+                  const SizedBox(height: 7),
                   _buildTextField(
                     controller: _phoneController,
                     hint: 'Enter 10-digit phone number',
+                    prefixIcon: Icons.phone_outlined,
                     keyboardType: TextInputType.phone,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
 
-                  // Home Address / City Field
-                  _buildLabel('City / Home Address'),
-                  const SizedBox(height: 6),
+                  _buildLabel('City / Home Address', icon: Icons.location_on_outlined),
+                  const SizedBox(height: 7),
                   _buildTextField(
                     controller: _addressController,
                     hint: 'Enter city or home address',
+                    prefixIcon: Icons.location_on_outlined,
+                  ),
+                  const SizedBox(height: 24),
+
+                  _buildSectionIntro(
+                    icon: Icons.medical_services_outlined,
+                    title: 'Treatment Information',
+                    subtitle: 'Share the reason for visit and notes',
                   ),
                   const SizedBox(height: 16),
 
-                  // Reason for Visit Dropdown
-                  _buildLabel('Reason for Visit'),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: _kCardBg,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: _kBorder),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _selectedReason,
-                        dropdownColor: _kCardBg,
-                        icon: const Icon(Icons.keyboard_arrow_down, color: _kMint),
-                        isExpanded: true,
-                        style: const TextStyle(
-                          color: _kTextPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        items: _visitReasons
-                            .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                            .toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() => _selectedReason = val);
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                  _buildLabel('Reason for Visit', required: true, icon: Icons.healing_outlined),
+                  const SizedBox(height: 7),
+                  _buildReasonDropdown(),
+                  const SizedBox(height: 18),
 
-                  // Clinical Notes Multiline Field
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildLabel('Clinical Notes'),
-                      Text(
-                        '${_notesController.text.length}/250',
-                        style: const TextStyle(color: _kTextMuted, fontSize: 12),
+                      _buildLabel('Clinical Notes', icon: Icons.notes_rounded),
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _notesController,
+                        builder: (_, value, __) => Text(
+                          '${value.text.length}/250',
+                          style: const TextStyle(color: _kTextMuted, fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 7),
                   _buildTextField(
                     controller: _notesController,
-                    hint: 'Enter clinical notes and patient history...',
-                    maxLines: 3,
+                    hint: 'Previous injury, surgery, symptoms, history...',
+                    prefixIcon: Icons.notes_rounded,
+                    maxLines: 4,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Keep notes concise and clinically relevant.',
+                    style: TextStyle(color: _kTextMuted, fontSize: 11),
+                  ),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),
           ),
         ),
-
-        // Bottom Action Button: Continue to Billing
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-          child: SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: _nextToBilling,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _kMint,
-                foregroundColor: const Color(0xFF0D1F17),
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28),
-                ),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Continue to Billing',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0D1F17),
-                    ),
-                  ),
-                  SizedBox(width: 6),
-                  Icon(Icons.arrow_forward, size: 20, color: Color(0xFF0D1F17)),
-                ],
-              ),
-            ),
-          ),
+        _buildBottomAction(
+          label: 'Continue to Billing',
+          icon: Icons.arrow_forward_rounded,
+          onPressed: _nextToBilling,
         ),
       ],
     );
   }
 
   // ==========================================
-  // STEP 2: Custom Billing Details (Amount Input)
+  // STEP 2: Billing Details
   // ==========================================
   Widget _buildStep2Billing() {
     return Column(
       key: const ValueKey('Step2'),
       children: [
         _buildHeader(
-          title: 'Billing Details',
-          subtitle: 'Step 2 of 3: Payments',
+          title: 'Billing',
+          subtitle: 'Payment information',
           stepDots: 2,
-          onBack: () {
-            setState(() => _currentStep = 1);
-          },
+          onBack: () => setState(() => _currentStep = 1),
         ),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Payment Mode Selection Segmented Bar
-                _buildLabel('Payment Mode'),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: _kCardBg,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _kBorder),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildModeSegment('Online Payment'),
-                      ),
-                      Expanded(
-                        child: _buildModeSegment('Offline Payment'),
-                      ),
-                    ],
-                  ),
+                _buildSectionIntro(
+                  icon: Icons.credit_card_outlined,
+                  title: 'Payment Method',
+                  subtitle: 'Choose how the payment is made',
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
+                _buildPaymentModeCards(),
+                const SizedBox(height: 24),
 
-                // Treatment Description Input
-                _buildLabel('Treatment / Service Description'),
-                const SizedBox(height: 6),
+                _buildSectionIntro(
+                  icon: Icons.medical_services_outlined,
+                  title: 'Service / Treatment',
+                  subtitle: 'Enter the treatment being billed',
+                ),
+                const SizedBox(height: 14),
+                _buildLabel('Treatment / Service Description', required: true, icon: Icons.receipt_long_outlined),
+                const SizedBox(height: 7),
                 _buildTextField(
                   controller: _descriptionController,
                   hint: 'e.g. Treatment Session',
+                  prefixIcon: Icons.receipt_long_outlined,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
-                // Total Treatment Amount Input
-                _buildLabel('Total Treatment Amount (Rs.)'),
-                const SizedBox(height: 6),
+                _buildSectionIntro(
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'Billing Details',
+                  subtitle: 'Enter the amount received today',
+                ),
+                const SizedBox(height: 14),
+                _buildLabel('Total Amount (Rs.)', required: true, icon: Icons.currency_rupee_rounded),
+                const SizedBox(height: 7),
                 _buildTextField(
                   controller: _totalAmountController,
-                  hint: 'Enter total amount e.g. 1000',
-                  keyboardType: TextInputType.number,
+                  hint: 'Enter total amount',
+                  prefixIcon: Icons.currency_rupee_rounded,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 ),
                 const SizedBox(height: 16),
-
-                // Amount Paid Now Input
-                _buildLabel('Amount Paid Now (Rs.)'),
-                const SizedBox(height: 6),
+                _buildLabel('Paid Today (Rs.)', required: true, icon: Icons.payments_outlined),
+                const SizedBox(height: 7),
                 _buildTextField(
                   controller: _paidAmountController,
-                  hint: 'Enter paid amount e.g. 800',
-                  keyboardType: TextInputType.number,
+                  hint: 'Enter amount paid today',
+                  prefixIcon: Icons.payments_outlined,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 ),
                 const SizedBox(height: 20),
-
-                // Invoice Calculation Summary Card
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: _kCardBg,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _kBorder),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Billing Summary',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: _kTextPrimary,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _remainingAmount == 0
-                                  ? const Color(0xFF064E3B)
-                                  : const Color(0xFF78350F),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              _remainingAmount == 0 ? 'FULLY PAID' : 'PARTIAL DUE',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: _remainingAmount == 0
-                                    ? _kMint
-                                    : const Color(0xFFFDE68A),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _buildInvoiceRow(
-                        _descriptionController.text.isNotEmpty
-                            ? _descriptionController.text
-                            : 'Treatment Session',
-                        'Rs. ${_totalAmount.toStringAsFixed(0)}',
-                      ),
-                      const SizedBox(height: 8),
-                      _buildInvoiceRow('Sub Total', 'Rs. ${_totalAmount.toStringAsFixed(0)}'),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 10),
-                        child: Divider(color: _kBorder, height: 1),
-                      ),
-                      _buildInvoiceRow('Total Amount', 'Rs. ${_totalAmount.toStringAsFixed(0)}'),
-                      const SizedBox(height: 8),
-                      _buildInvoiceRow('Total Paid Amount', 'Rs. ${_paidAmount.toStringAsFixed(0)}'),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Remaining Amount Due',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFFDE68A),
-                            ),
-                          ),
-                          Text(
-                            'Rs. ${_remainingAmount.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFFFDE68A),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                _buildBillingSummaryCard(),
               ],
             ),
           ),
         ),
-
-        // Bottom Action Button: Confirm & Continue
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-          child: SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: _isSubmitting ? null : _confirmAndSubmit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _kMint,
-                foregroundColor: const Color(0xFF0D1F17),
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28),
-                ),
-              ),
-              child: _isSubmitting
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF0D1F17),
-                        strokeWidth: 2.5,
-                      ),
-                    )
-                  : const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Confirm & Generate Bill',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0D1F17),
-                          ),
-                        ),
-                        SizedBox(width: 6),
-                        Icon(Icons.arrow_forward, size: 20, color: Color(0xFF0D1F17)),
-                      ],
-                    ),
-            ),
-          ),
+        _buildBottomAction(
+          label: _isSubmitting ? 'Saving Patient...' : 'Confirm & Generate Bill',
+          icon: Icons.arrow_forward_rounded,
+          onPressed: _isSubmitting ? null : _confirmAndSubmit,
+          loading: _isSubmitting,
         ),
       ],
     );
   }
 
   // ==========================================
-  // STEP 3: Success & Download PDF Bill
+  // STEP 3: Success
   // ==========================================
   Widget _buildStep3Success() {
+    final patientName = _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Patient';
     return Column(
       key: const ValueKey('Step3'),
       children: [
-        const SizedBox(height: 20),
-        // Success Badge
-        Container(
-          width: 76,
-          height: 76,
-          decoration: BoxDecoration(
-            color: _kMint,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: _kMint.withValues(alpha: 0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.check,
-            color: Color(0xFF0D1F17),
-            size: 44,
-          ),
+        _buildHeader(
+          title: 'Patient Added',
+          subtitle: 'Registration complete',
+          stepDots: 3,
+          onBack: () => _resetForm(),
         ),
-        const SizedBox(height: 18),
-
-        // Title and Subtitle
-        const Text(
-          'Patient Added Successfully!',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: _kTextPrimary,
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: 6),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 40),
-          child: Text(
-            'Registration and billing receipt processing is complete.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              color: _kTextMuted,
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Patient Registration Summary Card
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: _kCardBg,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _kBorder),
-            ),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
             child: Column(
               children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: _kMint,
-                      child: Text(
-                        _nameController.text.isNotEmpty
-                            ? _nameController.text.substring(0, 1).toUpperCase()
-                            : 'V',
-                        style: const TextStyle(
-                          color: Color(0xFF0D1F17),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _nameController.text.isNotEmpty
-                                ? _nameController.text
-                                : 'Vikram Singh Nagar',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: _kTextPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _selectedReason,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: _kTextSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE7F8F0),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFBDEBD3), width: 1),
+                  ),
+                  child: const Icon(Icons.check_rounded, color: _kSuccess, size: 48),
                 ),
-                const SizedBox(height: 14),
-                const Divider(color: _kBorder, height: 1),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Total Paid',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _kTextMuted,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Rs. ${_paidAmount.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: _kTextPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Text(
-                          'Remaining Due',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _kTextMuted,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Rs. ${_remainingAmount.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: _remainingAmount == 0 ? _kMint : const Color(0xFFFDE68A),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                const SizedBox(height: 20),
+                const Text(
+                  'Patient Added Successfully!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800, color: _kTextPrimary, letterSpacing: -0.5),
                 ),
+                const SizedBox(height: 8),
+                const Text(
+                  'The patient has been added and billing information is recorded.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, height: 1.45, color: _kTextSecondary),
+                ),
+                const SizedBox(height: 24),
+                _buildSuccessPatientCard(patientName),
+                const SizedBox(height: 16),
+                _buildSuccessAmountCard(),
               ],
             ),
           ),
         ),
-
-        const Spacer(),
-
-        // PDF Download Button & Action Buttons
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
           child: Column(
             children: [
-              // Download PDF Receipt Button matching exact PDF design format
               SizedBox(
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton.icon(
                   onPressed: _isGeneratingPdf ? null : _downloadPdfBill,
                   icon: _isGeneratingPdf
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                      : const Icon(Icons.picture_as_pdf, color: Colors.white, size: 22),
-                  label: Text(
-                    _isGeneratingPdf ? 'Generating PDF...' : 'Download PDF Bill / Receipt',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0284C7), // High visibility Blue for PDF
-                    foregroundColor: Colors.white,
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Go to Dashboard Button
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _goToDashboard,
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Icon(Icons.picture_as_pdf_outlined, size: 21),
+                  label: Text(_isGeneratingPdf ? 'Generating PDF...' : 'Download Receipt'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _kMint,
-                    foregroundColor: const Color(0xFF0D1F17),
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                  ),
-                  child: const Text(
-                    'Go to Dashboard',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0D1F17),
-                    ),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
               const SizedBox(height: 10),
-
-              // + Add Another Patient Button
               SizedBox(
                 width: double.infinity,
-                height: 48,
-                child: OutlinedButton(
-                  onPressed: _resetForm,
+                height: 50,
+                child: OutlinedButton.icon(
+                  onPressed: _goToDashboard,
+                  icon: const Icon(Icons.person_outline_rounded, size: 20),
+                  label: const Text('Back to Patients'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _kMint,
-                    side: const BorderSide(color: _kBorder, width: 1.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                  ),
-                  child: const Text(
-                    '+ Add Another Patient',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: _kMint,
-                    ),
+                    side: const BorderSide(color: _kBorder),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                   ),
                 ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _resetForm,
+                child: const Text('Add Another Patient', style: TextStyle(color: _kTextSecondary, fontWeight: FontWeight.w700)),
               ),
             ],
           ),
@@ -874,7 +538,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
   }
 
   // ==========================================
-  // HELPER WIDGETS
+  // UI helpers only — backend/state methods above are unchanged.
   // ==========================================
 
   Widget _buildHeader({
@@ -884,46 +548,43 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     required VoidCallback onBack,
   }) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      padding: const EdgeInsets.fromLTRB(12, 8, 20, 4),
+      child: Column(
         children: [
-          IconButton(
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_back, color: _kTextPrimary),
-          ),
-          Column(
+          Row(
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: _kTextPrimary,
+              IconButton(
+                onPressed: onBack,
+                icon: const Icon(Icons.arrow_back_rounded, color: _kTextPrimary),
+                tooltip: 'Back',
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _kTextPrimary)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: const TextStyle(fontSize: 12, color: _kTextSecondary, fontWeight: FontWeight.w500)),
+                  ],
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: _kTextMuted,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
+              Text('$stepDots/3', style: const TextStyle(fontSize: 13, color: _kTextSecondary, fontWeight: FontWeight.w700)),
             ],
           ),
-          // 3 Progress Dots
+          const SizedBox(height: 8),
           Row(
             children: List.generate(3, (index) {
-              final isActive = index < stepDots;
-              return Container(
-                margin: const EdgeInsets.only(left: 4),
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: isActive ? _kMint : _kBorder,
-                  shape: BoxShape.circle,
+              final active = index < stepDots;
+              final current = index == stepDots - 1;
+              return Expanded(
+                child: Container(
+                  margin: EdgeInsets.only(right: index == 2 ? 0 : 6),
+                  height: current ? 4 : 3,
+                  decoration: BoxDecoration(
+                    color: active ? _kMint : const Color(0xFFE4ECEF),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               );
             }),
@@ -933,56 +594,75 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     );
   }
 
-  Widget _buildPhotoUploadCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      decoration: BoxDecoration(
-        color: _kCardBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _kBorder),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: _kMint, width: 1.5),
-            ),
-            child: const Icon(Icons.camera_alt_outlined, color: _kMint, size: 22),
+  Widget _buildSectionIntro({required IconData icon, required String title, required String subtitle}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(color: const Color(0xFFE6F8FA), borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, color: _kMint, size: 21),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _kTextPrimary)),
+              const SizedBox(height: 3),
+              Text(subtitle, style: const TextStyle(fontSize: 12, color: _kTextSecondary, height: 1.3)),
+            ],
           ),
-          const SizedBox(height: 10),
-          const Text(
-            'Upload Patient Photo',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: _kTextPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'PNG, JPG up to 5MB (Optional)',
-            style: TextStyle(
-              fontSize: 12,
-              color: _kTextMuted,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildLabel(String label) {
-    return Text(
-      label,
-      style: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.bold,
-        color: _kTextPrimary,
-      ),
+  Widget _buildPhotoUploadCard() {
+    return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _kBorder),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(color: const Color(0xFFEAF8FA), shape: BoxShape.circle),
+              child: const Icon(Icons.camera_alt_outlined, color: _kMint, size: 25),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Add patient photo', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: _kTextPrimary)),
+                  SizedBox(height: 4),
+                  Text('Optional • Helps identify the patient quickly', style: TextStyle(fontSize: 11, color: _kTextSecondary, height: 1.3)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: _kTextMuted),
+          ],
+        ),
+    );
+  }
+
+  Widget _buildLabel(String label, {bool required = false, IconData? icon}) {
+    return Row(
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 16, color: _kTextSecondary),
+          const SizedBox(width: 6),
+        ],
+        Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: _kTextPrimary)),
+        if (required) const Text(' *', style: TextStyle(color: _kDanger, fontWeight: FontWeight.w800)),
+      ],
     );
   }
 
@@ -992,34 +672,56 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    IconData? prefixIcon,
   }) {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
       validator: validator,
-      style: const TextStyle(fontSize: 14, color: _kTextPrimary),
+      style: const TextStyle(fontSize: 14, color: _kTextPrimary, fontWeight: FontWeight.w500),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(color: _kTextMuted, fontSize: 13),
+        prefixIcon: prefixIcon == null ? null : Icon(prefixIcon, size: 19, color: _kTextSecondary),
         filled: true,
-        fillColor: _kCardBg,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(13),
           borderSide: const BorderSide(color: _kBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(13),
           borderSide: const BorderSide(color: _kMint, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.redAccent),
+          borderRadius: BorderRadius.circular(13),
+          borderSide: const BorderSide(color: _kDanger),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.redAccent),
+          borderRadius: BorderRadius.circular(13),
+          borderSide: const BorderSide(color: _kDanger, width: 1.5),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReasonDropdown() {
+    return Container(
+      padding: const EdgeInsets.only(left: 14, right: 8),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13), border: Border.all(color: _kBorder)),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedReason,
+          dropdownColor: Colors.white,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: _kTextSecondary),
+          isExpanded: true,
+          style: const TextStyle(color: _kTextPrimary, fontSize: 14, fontWeight: FontWeight.w600),
+          items: _visitReasons.map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis))).toList(),
+          onChanged: (val) {
+            if (val != null) setState(() => _selectedReason = val);
+          },
         ),
       ),
     );
@@ -1028,22 +730,27 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
   Widget _buildGenderPill(String gender) {
     final isSelected = _selectedGender == gender;
     return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedGender = gender),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isSelected ? _kMint : _kCardBg,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: isSelected ? _kMint : _kBorder),
-          ),
-          child: Text(
-            gender,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-              color: isSelected ? const Color(0xFF0D1F17) : _kTextSecondary,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(13),
+          onTap: () => setState(() => _selectedGender = gender),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isSelected ? _kMint : Colors.white,
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: isSelected ? _kMint : _kBorder),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.person_outline_rounded, size: 17, color: isSelected ? Colors.white : _kTextSecondary),
+                const SizedBox(width: 5),
+                Text(gender, style: TextStyle(fontSize: 12.5, fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600, color: isSelected ? Colors.white : _kTextPrimary)),
+              ],
             ),
           ),
         ),
@@ -1051,24 +758,161 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     );
   }
 
-  Widget _buildModeSegment(String mode) {
+  Widget _buildPaymentModeCards() {
+    return Row(
+      children: [
+        Expanded(child: _buildModeSegment('Offline Payment', icon: Icons.payments_outlined, caption: 'Cash / Manual')),
+        const SizedBox(width: 10),
+        Expanded(child: _buildModeSegment('Online Payment', icon: Icons.credit_card_outlined, caption: 'UPI / Card')),
+      ],
+    );
+  }
+
+  Widget _buildModeSegment(String mode, {IconData icon = Icons.payment_outlined, String caption = ''}) {
     final isSelected = _paymentMode == mode;
-    return GestureDetector(
-      onTap: () => setState(() => _paymentMode = mode),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isSelected ? _kMint : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          mode,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            color: isSelected ? const Color(0xFF0D1F17) : _kTextSecondary,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => setState(() => _paymentMode = mode),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFE8F8FA) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isSelected ? _kMint : _kBorder, width: isSelected ? 1.4 : 1),
           ),
+          child: Column(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(color: isSelected ? _kMint : const Color(0xFFF1F5F7), shape: BoxShape.circle),
+                child: Icon(icon, size: 20, color: isSelected ? Colors.white : _kTextSecondary),
+              ),
+              const SizedBox(height: 8),
+              Text(mode, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: isSelected ? _kMint : _kTextPrimary)),
+              if (caption.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(caption, style: const TextStyle(fontSize: 10, color: _kTextMuted)),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBillingSummaryCard() {
+    final fullyPaid = _remainingAmount == 0;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(width: 38, height: 38, decoration: BoxDecoration(color: const Color(0xFFEAF8FA), borderRadius: BorderRadius.circular(11)), child: const Icon(Icons.receipt_long_outlined, color: _kMint, size: 20)),
+              const SizedBox(width: 10),
+              const Expanded(child: Text('Billing Summary', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _kTextPrimary))),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(color: fullyPaid ? const Color(0xFFE7F8F0) : const Color(0xFFFFF4D9), borderRadius: BorderRadius.circular(20)),
+                child: Text(fullyPaid ? 'FULLY PAID' : 'PARTIAL DUE', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: fullyPaid ? _kSuccess : _kWarning)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildInvoiceRow(_descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : 'Treatment Session', 'Rs. ${_totalAmount.toStringAsFixed(0)}'),
+          const SizedBox(height: 8),
+          _buildInvoiceRow('Paid Today', 'Rs. ${_paidAmount.toStringAsFixed(0)}'),
+          const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(color: _kBorder, height: 1)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Remaining Due', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kTextPrimary)),
+              Text('Rs. ${_remainingAmount.toStringAsFixed(0)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: fullyPaid ? _kSuccess : _kDanger)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuccessPatientCard(String patientName) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _kBorder)),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: const Color(0xFFE8F8FA),
+            child: Text(patientName.substring(0, 1).toUpperCase(), style: const TextStyle(color: _kMint, fontSize: 20, fontWeight: FontWeight.w800)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(patientName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _kTextPrimary)),
+                const SizedBox(height: 4),
+                Text(_selectedReason, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: _kTextSecondary)),
+                const SizedBox(height: 3),
+                Text(_phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : 'No phone number', style: const TextStyle(fontSize: 11, color: _kTextMuted)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuccessAmountCard() {
+    final fullyPaid = _remainingAmount == 0;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _kBorder)),
+      child: Column(
+        children: [
+          _buildInvoiceRow('Total Amount', 'Rs. ${_totalAmount.toStringAsFixed(0)}'),
+          const SizedBox(height: 12),
+          _buildInvoiceRow('Paid Today', 'Rs. ${_paidAmount.toStringAsFixed(0)}'),
+          const SizedBox(height: 12),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            const Text('Remaining Due', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kTextPrimary)),
+            Text('Rs. ${_remainingAmount.toStringAsFixed(0)}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: fullyPaid ? _kSuccess : _kDanger)),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomAction({required String label, required IconData icon, required VoidCallback? onPressed, bool loading = false}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      child: SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _kMint,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: const Color(0xFFA7DDE1),
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+          child: loading
+              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.2))
+              : Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)), const SizedBox(width: 7), Icon(icon, size: 20)]),
         ),
       ),
     );
@@ -1076,24 +920,13 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
 
   Widget _buildInvoiceRow(String label, String amount) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            color: _kTextSecondary,
-          ),
-        ),
-        Text(
-          amount,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: _kTextPrimary,
-          ),
-        ),
+        Expanded(child: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: _kTextSecondary, fontWeight: FontWeight.w500))),
+        const SizedBox(width: 12),
+        Text(amount, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _kTextPrimary)),
       ],
     );
   }
+
 }
