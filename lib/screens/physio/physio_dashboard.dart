@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../services/patient_service.dart';
-import 'add_patient_screen.dart';
 import 'calendar_screen.dart';
 import 'patient_detail_screen.dart';
 import 'patient_list_screen.dart';
@@ -10,7 +9,7 @@ import 'physio_navigation.dart';
 import 'physio_main_shell.dart';
 import '../auth/login_screen.dart';
 
-// Physio frontend theme — keep backend/API files untouched.
+// PhysioSoft frontend theme — unchanged.
 const Color kPrimaryCyan = Color(0xFF00AFC1);
 const Color kDarkCyan = Color(0xFF008C9E);
 const Color kLightCyan = Color(0xFFE8F9FB);
@@ -23,7 +22,6 @@ const Color kSuccess = Color(0xFF22C55E);
 const Color kWarning = Color(0xFFF59E0B);
 const Color kError = Color(0xFFEF4444);
 
-// Kept for compatibility with any existing references in the project.
 const Color kPrimaryBlue = kPrimaryCyan;
 const Color kPrimaryTeal = kDarkCyan;
 const Color kCoral = Color(0xFFFF6B4A);
@@ -58,36 +56,32 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
 
   Future<void> _loadDashboardData() async {
     if (!mounted) return;
-
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      // Start both reads together so the dashboard does not wait for them one-by-one.
       final userFuture = AuthService().getProfile();
       final patientsFuture = PatientService().getPatients();
       final user = await userFuture;
       final patientModels = await patientsFuture;
 
-      final dashboardPatients = patientModels.map((p) {
-        return DashboardPatient(
-          id: p.id ?? '',
-          name: p.name,
-          condition: p.condition,
-          phone: p.phone ?? 'No number',
-          time: '10:00 AM',
-          status: 'CONFIRMED',
-        );
-      }).toList();
+      final patients = patientModels.map((p) => DashboardPatient(
+        id: p.id ?? '',
+        name: p.name,
+        condition: p.condition,
+        phone: p.phone ?? 'No number',
+        time: '10:00 AM',
+        status: 'CONFIRMED',
+      )).toList();
 
       if (!mounted) return;
       setState(() {
         _physioName = user.fullName.isNotEmpty ? user.fullName : 'Dr. Alex';
         _specialty = 'Sports & Orthopedic Physiotherapy';
-        _todayPatientsCount = dashboardPatients.length;
-        _todayPatients = dashboardPatients;
+        _todayPatientsCount = patients.length;
+        _todayPatients = patients;
         _isLoading = false;
       });
     } catch (_) {
@@ -109,50 +103,39 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.embedded) {
-      return const PhysioMainShell();
-    }
+    if (!widget.embedded) return const PhysioMainShell();
 
     return PhysioSystemUi(
       statusBarColor: kDarkCyan,
       statusBarBrightness: Brightness.dark,
       child: Scaffold(
-      backgroundColor: kPageBackground,
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          color: kPrimaryCyan,
-          backgroundColor: Colors.white,
-          onRefresh: _refreshDashboard,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(child: _buildHeader()),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
-                sliver: SliverToBoxAdapter(
-                  child: _isLoading
-                      ? _buildLoadingState()
-                      : _errorMessage != null
-                          ? _buildErrorState()
-                          : _buildDashboardContent(),
+        backgroundColor: kPageBackground,
+        body: SafeArea(
+          bottom: false,
+          child: RefreshIndicator(
+            color: kPrimaryCyan,
+            backgroundColor: Colors.white,
+            onRefresh: _refreshDashboard,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(child: _buildHeader()),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                  sliver: SliverToBoxAdapter(
+                    child: _isLoading
+                        ? _buildLoadingState()
+                        : _errorMessage != null
+                            ? _buildErrorState()
+                            : _buildDashboardContent(),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
+        bottomNavigationBar: widget.embedded ? null : _buildBottomNavigationBar(),
       ),
-      floatingActionButton: FloatingActionButton(
-        key: const ValueKey('fab'),
-        onPressed: _openAddPatient,
-        backgroundColor: kPrimaryCyan,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        child: const Icon(Icons.add, size: 28),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      bottomNavigationBar: widget.embedded ? null : _buildBottomNavigationBar(),
-    ),
     );
   }
 
@@ -171,46 +154,34 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
         children: [
           Row(
             children: [
-              _headerIconButton(
-                icon: Icons.menu_rounded,
-                onTap: () {},
+              _headerIconButton(Icons.menu_rounded, () {}),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text('PhysioSoft', style: TextStyle(
+                  color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800,
+                )),
               ),
-              const Spacer(),
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  _headerIconButton(
-                    icon: Icons.notifications_none_rounded,
-                    onTap: () {},
-                  ),
+                  _headerIconButton(Icons.notifications_none_rounded, () {}),
                   Positioned(
-                    right: 2,
-                    top: 0,
+                    right: 0, top: -1,
                     child: Container(
-                      width: 19,
-                      height: 19,
+                      width: 19, height: 19,
                       alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        color: kError,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Text(
-                        '3',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+                      decoration: const BoxDecoration(color: kError, shape: BoxShape.circle),
+                      child: const Text('3', style: TextStyle(
+                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800,
+                      )),
                     ),
                   ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               _buildProfileAvatar(),
               const SizedBox(width: 14),
@@ -218,36 +189,17 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Good morning,',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                    const Text('Good morning,', style: TextStyle(
+                      color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500,
+                    )),
                     const SizedBox(height: 3),
-                    Text(
-                      _displayPhysioName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Text(_displayPhysioName, maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
+                        color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800,
+                      )),
                     const SizedBox(height: 4),
-                    Text(
-                      _specialty,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
-                    ),
+                    Text(_specialty, maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white70, fontSize: 12)),
                   ],
                 ),
               ),
@@ -258,14 +210,9 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
             children: [
               const Icon(Icons.calendar_today_outlined, color: Colors.white, size: 16),
               const SizedBox(width: 8),
-              Text(
-                _formatDate(DateTime.now()),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              Text(_formatDate(DateTime.now()), style: const TextStyle(
+                color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600,
+              )),
             ],
           ),
         ],
@@ -278,7 +225,7 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
     return _physioName.startsWith('Dr.') ? _physioName : 'Dr. $_physioName';
   }
 
-  Widget _headerIconButton({required IconData icon, required VoidCallback onTap}) {
+  Widget _headerIconButton(IconData icon, VoidCallback onTap) {
     return Material(
       color: Colors.white.withValues(alpha: 0.12),
       shape: const CircleBorder(),
@@ -295,30 +242,19 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
 
   Widget _buildProfileAvatar() {
     return Container(
-      width: 68,
-      height: 68,
+      width: 68, height: 68,
       decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.8), width: 3),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 12,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        color: Colors.white, shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: .8), width: 3),
+        boxShadow: [BoxShadow(
+          color: Colors.black.withValues(alpha: .12), blurRadius: 12, offset: const Offset(0, 5),
+        )],
       ),
       child: CircleAvatar(
         backgroundColor: kLightCyan,
-        child: Text(
-          _getInitials(_physioName),
-          style: const TextStyle(
-            color: kDarkCyan,
-            fontSize: 21,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
+        child: Text(_getInitials(_physioName), style: const TextStyle(
+          color: kDarkCyan, fontSize: 21, fontWeight: FontWeight.w800,
+        )),
       ),
     );
   }
@@ -327,386 +263,442 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildStatsSection(),
+        _buildTodayOverview(),
+        const SizedBox(height: 16),
+        _buildNextPatientCard(),
         const SizedBox(height: 22),
-        _buildSectionHeader('Today\'s Schedule', 'See all', () {
-          _navigateTo(const CalendarScreen());
-        }),
+        _sectionHeader('Today\'s Schedule', 'View all', () => _navigateTo(const CalendarScreen())),
         const SizedBox(height: 10),
         _buildScheduleCard(),
         const SizedBox(height: 22),
-        _buildSectionHeader('Needs Attention', 'See all', () {}),
+        _sectionHeader('Patient Watchlist', 'View all', () => _navigateTo(const PatientListScreen())),
         const SizedBox(height: 10),
-        _buildAttentionCard(),
+        _buildWatchlistCard(),
         const SizedBox(height: 22),
-        const Text(
-          'Quick Actions',
-          style: TextStyle(
-            color: kTextPrimary,
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 10),
-        _buildQuickActions(),
+        _buildPerformanceCard(),
         const SizedBox(height: 22),
-        _buildSectionHeader('Overview', 'This Month', () {}),
+        _sectionHeader('Recent Patients', 'View all', () => _navigateTo(const PatientListScreen())),
         const SizedBox(height: 10),
-        _buildOverviewCard(),
+        _buildRecentPatients(),
+        const SizedBox(height: 22),
+        _buildInsightCard(),
       ],
     );
   }
 
-  Widget _buildStatsSection() {
-    final stats = [
-      _DashboardStat(
-        icon: Icons.people_alt_outlined,
-        title: 'Patients Today',
-        value: '$_todayPatientsCount',
-        change: '+ 3 new',
-        iconBackground: const Color(0xFFE7F8FA),
-        iconColor: kPrimaryCyan,
-        changeColor: kSuccess,
-      ),
-      _DashboardStat(
-        icon: Icons.event_available_outlined,
-        title: 'Sessions Today',
-        value: '$_completedThisWeek',
-        change: '↑ 2 completed',
-        iconBackground: const Color(0xFFEAF9F3),
-        iconColor: kSuccess,
-        changeColor: kSuccess,
-      ),
-      _DashboardStat(
-        icon: Icons.bookmark_border_rounded,
-        title: 'Pending Bookings',
-        value: '$_pendingBookingsCount',
-        change: 'Awaiting',
-        iconBackground: const Color(0xFFFFF4E5),
-        iconColor: kWarning,
-        changeColor: kWarning,
-      ),
-      _DashboardStat(
-        icon: Icons.account_balance_wallet_outlined,
-        title: 'Revenue (This Month)',
-        value: _formatRevenue(_monthlyRevenue),
-        change: '↑ 12%',
-        iconBackground: const Color(0xFFE8F4FF),
-        iconColor: const Color(0xFF3B82F6),
-        changeColor: kSuccess,
-      ),
-    ];
+  Widget _buildTodayOverview() {
+    final total = _todayPatientsCount;
+    final completed = total == 0 ? 0 : (_completedThisWeek > total ? total : _completedThisWeek);
+    final remaining = total > completed ? total - completed : 0;
+    final progress = total == 0 ? 0.0 : completed / total;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 700 ? 4 : 2;
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: stats.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: constraints.maxWidth >= 700 ? 1.55 : 1.28,
+    return _card(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('TODAY\'S OVERVIEW', style: TextStyle(
+            color: kDarkCyan, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: .5,
+          )),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: _numberMetric('$total', 'Appointments')),
+            _divider(),
+            Expanded(child: _numberMetric('$completed', 'Completed')),
+            _divider(),
+            Expanded(child: _numberMetric('$remaining', 'Remaining')),
+          ]),
+          const SizedBox(height: 16),
+          Row(children: [
+            Expanded(child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: LinearProgressIndicator(
+                minHeight: 8, value: progress,
+                backgroundColor: kLightCyan,
+                valueColor: const AlwaysStoppedAnimation(kPrimaryCyan),
+              ),
+            )),
+            const SizedBox(width: 10),
+            Text('${(progress * 100).round()}%', style: const TextStyle(
+              color: kTextPrimary, fontSize: 12, fontWeight: FontWeight.w800,
+            )),
+          ]),
+          const SizedBox(height: 7),
+          Text(
+            total == 0 ? 'No appointments are available yet.' : '$completed of $total scheduled sessions completed',
+            style: const TextStyle(color: kTextSecondary, fontSize: 10.5),
           ),
-          itemBuilder: (_, index) => StatCard(stat: stats[index]),
-        );
-      },
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNextPatientCard() {
+    final patient = _todayPatients.isEmpty ? null : _todayPatients.first;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [kDarkCyan, kPrimaryCyan],
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(
+          color: kDarkCyan.withValues(alpha: .20), blurRadius: 18, offset: const Offset(0, 8),
+        )],
+      ),
+      child: patient == null
+          ? const Row(children: [
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('NEXT PATIENT', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: .6)),
+                SizedBox(height: 8),
+                Text('Your next appointment will appear here.', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+              ])),
+              Icon(Icons.event_available_rounded, color: Colors.white70, size: 42),
+            ])
+          : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('NEXT PATIENT', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: .6)),
+              const SizedBox(height: 7),
+              const Text('10:00 AM', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 13),
+              Row(children: [
+                Container(
+                  width: 54, height: 54, alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle, color: Colors.white.withValues(alpha: .10),
+                    border: Border.all(color: Colors.white.withValues(alpha: .85)),
+                  ),
+                  child: Text(patient.initials, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(patient.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 3),
+                  Text(patient.condition, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(10)),
+                    child: const Text('Confirmed', style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w700)),
+                  ),
+                ])),
+                const SizedBox(width: 8),
+                Material(
+                  color: Colors.white, borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: patient.id.isEmpty ? null : () => _navigateTo(PatientDetailScreen(patientId: patient.id, initialTabIndex: 0)),
+                    borderRadius: BorderRadius.circular(12),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 11, vertical: 11),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text('Profile', style: TextStyle(color: kDarkCyan, fontSize: 10.5, fontWeight: FontWeight.w800)),
+                        SizedBox(width: 4),
+                        Icon(Icons.arrow_forward_rounded, color: kDarkCyan, size: 16),
+                      ]),
+                    ),
+                  ),
+                ),
+              ]),
+            ]),
     );
   }
 
   Widget _buildScheduleCard() {
+    final patients = _todayPatients.take(4).toList();
+    if (patients.isEmpty) {
+      return _card(padding: const EdgeInsets.all(22), child: const Column(children: [
+        Icon(Icons.calendar_month_outlined, color: kPrimaryCyan, size: 34),
+        SizedBox(height: 10),
+        Text('No appointments yet', style: TextStyle(color: kTextPrimary, fontSize: 14, fontWeight: FontWeight.w800)),
+        SizedBox(height: 4),
+        Text('Your daily schedule will appear here.', textAlign: TextAlign.center, style: TextStyle(color: kTextSecondary, fontSize: 11)),
+      ]));
+    }
+
+    const times = ['09:00 AM', '10:00 AM', '12:00 PM', '04:30 PM'];
+    return _card(
+      padding: EdgeInsets.zero,
+      child: Column(children: [
+        for (var i = 0; i < patients.length; i++)
+          _ScheduleRow(
+            patient: patients[i],
+            time: times[i],
+            status: i == 0 ? 'Completed' : i == 1 ? 'Starting Soon' : 'Upcoming',
+            isFirst: i == 0,
+            isLast: i == patients.length - 1,
+            onTap: patients[i].id.isEmpty ? null : () => _navigateTo(PatientDetailScreen(patientId: patients[i].id, initialTabIndex: 0)),
+          ),
+      ]),
+    );
+  }
+
+  Widget _buildWatchlistCard() {
     final patients = _todayPatients.take(3).toList();
-    final fallback = [
-      const DashboardPatient(
-        id: '',
-        name: 'No appointments yet',
-        condition: 'Your schedule will appear here',
-        phone: '',
-        time: '--:--',
-        status: 'UPCOMING',
-      ),
-    ];
-    final rows = patients.isEmpty ? fallback : patients;
-    final times = ['09:00 AM', '10:00 AM', '11:30 AM'];
-    final durations = ['30 min', '45 min', '30 min'];
+    if (patients.isEmpty) {
+      return _card(padding: const EdgeInsets.all(18), child: const Row(children: [
+        CircleAvatar(radius: 20, backgroundColor: kLightCyan, child: Icon(Icons.check_rounded, color: kDarkCyan)),
+        SizedBox(width: 12),
+        Expanded(child: Text('No patients need attention right now.', style: TextStyle(color: kTextSecondary, fontSize: 11.5, fontWeight: FontWeight.w600))),
+      ]));
+    }
 
-    return Container(
-      decoration: _cardDecoration(),
-      child: Column(
-        children: [
-          for (var index = 0; index < rows.length; index++) ...[
-            _ScheduleRow(
-              patient: rows[index],
-              time: patients.isEmpty ? rows[index].time : times[index],
-              duration: patients.isEmpty ? '' : durations[index],
-              status: patients.isEmpty ? 'UPCOMING' : index == 2 ? 'PENDING' : 'CONFIRMED',
-              onTap: rows[index].id.isEmpty
-                  ? null
-                  : () => _navigateTo(
-                        PatientDetailScreen(patientId: rows[index].id, initialTabIndex: 0),
+    const messages = ['Review patient progress', 'Check exercise adherence', 'Follow-up recommended'];
+    const colors = [kError, kWarning, kPrimaryCyan];
+    return _card(
+      padding: EdgeInsets.zero,
+      child: Column(children: [
+        for (var i = 0; i < patients.length; i++)
+          _WatchlistRow(
+            patient: patients[i], color: colors[i], message: messages[i],
+            onTap: patients[i].id.isEmpty ? null : () => _navigateTo(PatientDetailScreen(patientId: patients[i].id, initialTabIndex: i == 1 ? 1 : 0)),
+          ),
+      ]),
+    );
+  }
+
+  Widget _buildPerformanceCard() {
+    final total = _todayPatientsCount;
+    final completed = total == 0 ? 0 : (_completedThisWeek > total ? total : _completedThisWeek);
+    final rate = total == 0 ? 0 : ((completed / total) * 100).round();
+
+    return _card(
+      padding: const EdgeInsets.all(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Expanded(child: Text('Treatment Performance', style: TextStyle(color: kDarkCyan, fontSize: 13, fontWeight: FontWeight.w800))),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(color: kLightCyan, borderRadius: BorderRadius.circular(10)),
+            child: const Text('Today', style: TextStyle(color: kDarkCyan, fontSize: 9.5, fontWeight: FontWeight.w700)),
+          ),
+        ]),
+        const SizedBox(height: 16),
+        Row(children: [
+          SizedBox(
+            width: 108, height: 108,
+            child: Stack(alignment: Alignment.center, children: [
+              SizedBox(width: 96, height: 96, child: CircularProgressIndicator(
+                value: total == 0 ? 0 : completed / total,
+                strokeWidth: 10,
+                backgroundColor: kLightCyan,
+                valueColor: const AlwaysStoppedAnimation(kPrimaryCyan),
+              )),
+              Column(mainAxisSize: MainAxisSize.min, children: [
+                Text('$rate%', style: const TextStyle(color: kTextPrimary, fontSize: 20, fontWeight: FontWeight.w800)),
+                const Text('completion', style: TextStyle(color: kTextSecondary, fontSize: 9, fontWeight: FontWeight.w600)),
+              ]),
+            ]),
+          ),
+          const SizedBox(width: 16),
+          Expanded(child: Column(children: [
+            _legend(kPrimaryCyan, 'Scheduled', '$total'),
+            const SizedBox(height: 10),
+            _legend(kSuccess, 'Completed', '$completed'),
+            const SizedBox(height: 10),
+            _legend(kWarning, 'Pending', '$_pendingBookingsCount'),
+          ])),
+        ]),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity, padding: const EdgeInsets.all(11),
+          decoration: BoxDecoration(color: kLightCyan, borderRadius: BorderRadius.circular(12)),
+          child: Row(children: [
+            const Icon(Icons.trending_up_rounded, color: kDarkCyan, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(
+              total == 0 ? 'Add appointments to start tracking performance.' : 'Keep your schedule moving and complete today\'s sessions.',
+              style: const TextStyle(color: kDarkCyan, fontSize: 10.5, fontWeight: FontWeight.w700),
+            )),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildRecentPatients() {
+    final patients = _todayPatients.take(4).toList();
+    if (patients.isEmpty) {
+      return _card(padding: const EdgeInsets.all(18), child: const Text(
+        'Recently viewed patients will appear here.', style: TextStyle(color: kTextSecondary, fontSize: 11),
+      ));
+    }
+
+    return SizedBox(
+      height: 145,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: patients.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (_, i) {
+          final patient = patients[i];
+          final improving = i.isEven;
+          return SizedBox(
+            width: 150,
+            child: Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(17),
+              child: InkWell(
+                onTap: patient.id.isEmpty ? null : () => _navigateTo(PatientDetailScreen(patientId: patient.id, initialTabIndex: 0)),
+                borderRadius: BorderRadius.circular(17),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(17),
+                    border: Border.all(color: kBorder),
+                    boxShadow: [BoxShadow(color: kTextPrimary.withValues(alpha: .035), blurRadius: 10, offset: const Offset(0, 4))],
+                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundColor: improving ? kLightCyan : const Color(0xFFF0EDFF),
+                        child: Text(patient.initials, style: TextStyle(
+                          color: improving ? kDarkCyan : const Color(0xFF6D5BD0), fontSize: 11, fontWeight: FontWeight.w800,
+                        )),
                       ),
+                      const Spacer(),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: kTextSecondary),
+                    ]),
+                    const SizedBox(height: 9),
+                    Text(patient.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(
+                      color: kTextPrimary, fontSize: 12, fontWeight: FontWeight.w800,
+                    )),
+                    const SizedBox(height: 3),
+                    Text(patient.condition, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(
+                      color: kTextSecondary, fontSize: 9.5,
+                    )),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: improving ? const Color(0xFFEAF9F0) : const Color(0xFFEAF4FF),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Text(improving ? 'Improving' : 'In Progress', style: TextStyle(
+                        color: improving ? const Color(0xFF159447) : const Color(0xFF2775CA),
+                        fontSize: 8.5, fontWeight: FontWeight.w800,
+                      )),
+                    ),
+                  ]),
+                ),
+              ),
             ),
-            if (index < rows.length - 1) const Divider(height: 1, indent: 72, endIndent: 12, color: kBorder),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAttentionCard() {
-    final patients = _todayPatients.take(2).toList();
-    final items = <_AttentionItem>[];
-
-    if (patients.isNotEmpty) {
-      items.add(
-        _AttentionItem(
-          icon: Icons.trending_up_rounded,
-          iconColor: kError,
-          title: patients.first.name,
-          subtitle: 'Review patient progress',
-          action: 'Review',
-          actionColor: kError,
-          onTap: () => _navigateTo(
-            PatientDetailScreen(patientId: patients.first.id, initialTabIndex: 0),
-          ),
-        ),
-      );
-    }
-
-    if (patients.length > 1) {
-      items.add(
-        _AttentionItem(
-          icon: Icons.priority_high_rounded,
-          iconColor: kWarning,
-          title: patients[1].name,
-          subtitle: 'Check exercise adherence',
-          action: 'View',
-          actionColor: kWarning,
-          onTap: () => _navigateTo(
-            PatientDetailScreen(patientId: patients[1].id, initialTabIndex: 1),
-          ),
-        ),
-      );
-    }
-
-    if (items.isEmpty) {
-      items.add(
-        const _AttentionItem(
-          icon: Icons.check_circle_outline_rounded,
-          iconColor: kSuccess,
-          title: 'All caught up',
-          subtitle: 'No urgent items need your attention.',
-          action: '',
-          actionColor: kSuccess,
-        ),
-      );
-    }
-
-    return Container(
-      decoration: _cardDecoration(),
-      child: Column(
-        children: [
-          for (var index = 0; index < items.length; index++) ...[
-            items[index],
-            if (index < items.length - 1) const Divider(height: 1, indent: 58, endIndent: 12, color: kBorder),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActions() {
-    final actions = [
-      _QuickAction(
-        icon: Icons.person_add_alt_1_rounded,
-        label: 'Add Patient',
-        color: kPrimaryCyan,
-        onTap: _openAddPatient,
-      ),
-      _QuickAction(
-        icon: Icons.calendar_month_outlined,
-        label: 'New Appointment',
-        color: const Color(0xFF3B82F6),
-        onTap: () => _navigateTo(const CalendarScreen()),
-      ),
-      _QuickAction(
-        icon: Icons.accessibility_new_rounded,
-        label: 'Start Session',
-        color: kSuccess,
-        onTap: () {
-          if (_todayPatients.isNotEmpty) {
-            _navigateTo(
-              PatientDetailScreen(patientId: _todayPatients.first.id, initialTabIndex: 1),
-            );
-          } else {
-            _showComingSoon('Start Session');
-          }
+          );
         },
       ),
-      _QuickAction(
-        icon: Icons.note_add_outlined,
-        label: 'Add Note',
-        color: const Color(0xFF8B5CF6),
-        onTap: () {
-          if (_todayPatients.isNotEmpty) {
-            _navigateTo(
-              PatientDetailScreen(patientId: _todayPatients.first.id, initialTabIndex: 1),
-            );
-          } else {
-            _showComingSoon('Add Note');
-          }
-        },
-      ),
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 700 ? 4 : 2;
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: actions.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: constraints.maxWidth >= 700 ? 1.6 : 1.45,
-          ),
-          itemBuilder: (_, index) => actions[index],
-        );
-      },
     );
   }
 
-  Widget _buildOverviewCard() {
+  Widget _buildInsightCard() {
+    final total = _todayPatientsCount;
+    final completed = _completedThisWeek;
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(),
-      child: Row(
-        children: [
-          Expanded(
-            child: _OverviewMetric(
-              icon: Icons.people_alt_outlined,
-              label: 'Total Patients',
-              value: '${_todayPatientsCount * 7}',
-              change: '↑ 18%',
-              color: kPrimaryCyan,
-            ),
-          ),
-          _verticalDivider(),
-          Expanded(
-            child: _OverviewMetric(
-              icon: Icons.check_circle_outline_rounded,
-              label: 'Completed Sessions',
-              value: '$_completedThisWeek',
-              change: '↑ 15%',
-              color: kSuccess,
-            ),
-          ),
-          _verticalDivider(),
-          Expanded(
-            child: _OverviewMetric(
-              icon: Icons.currency_rupee_rounded,
-              label: 'Revenue',
-              value: _formatRevenue(_monthlyRevenue),
-              change: '↑ 12%',
-              color: kWarning,
-            ),
-          ),
-        ],
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [kLightCyan, Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kPrimaryCyan.withValues(alpha: .10)),
       ),
-    );
-  }
-
-  Widget _verticalDivider() {
-    return Container(width: 1, height: 58, color: kBorder, margin: const EdgeInsets.symmetric(horizontal: 8));
-  }
-
-  Widget _buildSectionHeader(String title, String action, VoidCallback onTap) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              color: kTextPrimary,
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+      child: Row(children: [
+        Container(
+          width: 46, height: 46,
+          decoration: const BoxDecoration(color: kDarkCyan, shape: BoxShape.circle),
+          child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 22),
         ),
-        TextButton(
-          onPressed: onTap,
-          style: TextButton.styleFrom(
-            foregroundColor: kPrimaryCyan,
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: Text(
-            action,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-          ),
-        ),
-      ],
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('TODAY\'S INSIGHT', style: TextStyle(color: kDarkCyan, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: .6)),
+          const SizedBox(height: 5),
+          Text(total == 0 ? 'Your dashboard is ready for today.' : '$completed of $total scheduled sessions are completed.', style: const TextStyle(
+            color: kTextPrimary, fontSize: 11, fontWeight: FontWeight.w700,
+          )),
+          const SizedBox(height: 5),
+          const Text('Keep your practice moving forward. ✨', style: TextStyle(
+            color: kDarkCyan, fontSize: 10.5, fontWeight: FontWeight.w700,
+          )),
+        ])),
+      ]),
     );
   }
 
   Widget _buildLoadingState() {
-    return Column(
-      children: List.generate(
-        4,
-        (index) => Container(
-          height: index == 0 ? 130 : 72,
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-          ),
-        ),
-      ),
-    );
+    return Column(children: [
+      const _SkeletonCard(height: 150),
+      const SizedBox(height: 12),
+      const _SkeletonCard(height: 180),
+      const SizedBox(height: 12),
+      const _SkeletonCard(height: 230),
+      const SizedBox(height: 12),
+      const _SkeletonCard(height: 150),
+    ]);
   }
 
   Widget _buildErrorState() {
-    return Container(
-      width: double.infinity,
+    return _card(
       padding: const EdgeInsets.all(24),
-      decoration: _cardDecoration(),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF0F0),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(Icons.cloud_off_rounded, color: kError, size: 32),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Could not load dashboard',
-            style: TextStyle(color: kTextPrimary, fontSize: 16, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _errorMessage ?? 'Something went wrong. Please try again.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: kTextSecondary, fontSize: 13),
-          ),
-          const SizedBox(height: 14),
-          FilledButton.icon(
-            onPressed: _loadDashboardData,
-            style: FilledButton.styleFrom(backgroundColor: kPrimaryCyan),
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Try again'),
-          ),
-        ],
-      ),
+      child: Column(children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(color: const Color(0xFFFFF0F0), borderRadius: BorderRadius.circular(16)),
+          child: const Icon(Icons.cloud_off_rounded, color: kError, size: 32),
+        ),
+        const SizedBox(height: 12),
+        const Text('Could not load dashboard', style: TextStyle(color: kTextPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 6),
+        Text(_errorMessage ?? 'Something went wrong. Please try again.', textAlign: TextAlign.center, style: const TextStyle(color: kTextSecondary, fontSize: 13)),
+        const SizedBox(height: 14),
+        FilledButton.icon(
+          onPressed: _loadDashboardData,
+          style: FilledButton.styleFrom(backgroundColor: kPrimaryCyan),
+          icon: const Icon(Icons.refresh_rounded), label: const Text('Try again'),
+        ),
+      ]),
     );
   }
+
+  Widget _sectionHeader(String title, String action, VoidCallback onTap) {
+    return Row(children: [
+      Expanded(child: Text(title, style: const TextStyle(color: kTextPrimary, fontSize: 17, fontWeight: FontWeight.w800))),
+      TextButton(
+        onPressed: onTap,
+        style: TextButton.styleFrom(foregroundColor: kPrimaryCyan, padding: const EdgeInsets.symmetric(horizontal: 6), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(action, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+          const SizedBox(width: 3), const Icon(Icons.arrow_forward_rounded, size: 15),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _card({required Widget child, EdgeInsetsGeometry padding = const EdgeInsets.all(16)}) {
+    return Container(
+      width: double.infinity,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: kCardBackground,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kBorder),
+        boxShadow: [BoxShadow(color: const Color(0xFF123047).withValues(alpha: .045), blurRadius: 16, offset: const Offset(0, 5))],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _numberMetric(String value, String label) => Column(children: [
+    Text(value, style: const TextStyle(color: kTextPrimary, fontSize: 22, fontWeight: FontWeight.w800)),
+    const SizedBox(height: 3),
+    Text(label, textAlign: TextAlign.center, style: const TextStyle(color: kTextSecondary, fontSize: 10.5, fontWeight: FontWeight.w600)),
+  ]);
+
+  Widget _divider() => Container(width: 1, height: 34, color: kBorder);
+
+  Widget _legend(Color color, String title, String value) => Row(children: [
+    Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+    const SizedBox(width: 8),
+    Expanded(child: Text(title, style: const TextStyle(color: kTextSecondary, fontSize: 10.5, fontWeight: FontWeight.w600))),
+    Text(value, style: const TextStyle(color: kTextPrimary, fontSize: 11, fontWeight: FontWeight.w800)),
+  ]);
 
   NavigationBar _buildBottomNavigationBar() {
     return NavigationBar(
@@ -714,37 +706,15 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
       onDestinationSelected: _onNavigationTapped,
       backgroundColor: Colors.white,
       elevation: 10,
-      shadowColor: Colors.black.withValues(alpha: 0.08),
+      shadowColor: Colors.black.withValues(alpha: .08),
       indicatorColor: kLightCyan,
-      labelTextStyle: const WidgetStatePropertyAll(
-        TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-      ),
+      labelTextStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
       destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.home_outlined, color: kTextSecondary),
-          selectedIcon: Icon(Icons.home_rounded, color: kPrimaryCyan),
-          label: 'Home',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.people_outline_rounded, color: kTextSecondary),
-          selectedIcon: Icon(Icons.people_rounded, color: kPrimaryCyan),
-          label: 'Patients',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.calendar_today_outlined, color: kTextSecondary),
-          selectedIcon: Icon(Icons.calendar_today_rounded, color: kPrimaryCyan),
-          label: 'Calendar',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.insights_outlined, color: kTextSecondary),
-          selectedIcon: Icon(Icons.insights_rounded, color: kPrimaryCyan),
-          label: 'Analytics',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.person_outline_rounded, color: kTextSecondary),
-          selectedIcon: Icon(Icons.person_rounded, color: kPrimaryCyan),
-          label: 'Profile',
-        ),
+        NavigationDestination(icon: Icon(Icons.home_outlined, color: kTextSecondary), selectedIcon: Icon(Icons.home_rounded, color: kPrimaryCyan), label: 'Home'),
+        NavigationDestination(icon: Icon(Icons.people_outline_rounded, color: kTextSecondary), selectedIcon: Icon(Icons.people_rounded, color: kPrimaryCyan), label: 'Patients'),
+        NavigationDestination(icon: Icon(Icons.calendar_today_outlined, color: kTextSecondary), selectedIcon: Icon(Icons.calendar_today_rounded, color: kPrimaryCyan), label: 'Calendar'),
+        NavigationDestination(icon: Icon(Icons.insights_outlined, color: kTextSecondary), selectedIcon: Icon(Icons.insights_rounded, color: kPrimaryCyan), label: 'Analytics'),
+        NavigationDestination(icon: Icon(Icons.person_outline_rounded, color: kTextSecondary), selectedIcon: Icon(Icons.person_rounded, color: kPrimaryCyan), label: 'Profile'),
       ],
     );
   }
@@ -754,19 +724,16 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
       setState(() => _selectedIndex = 0);
       return;
     }
-
     final Widget? page = switch (index) {
       1 => const PatientListScreen(),
       2 => const CalendarScreen(),
       4 => const ProfileScreen(),
       _ => null,
     };
-
     if (page == null) {
       setState(() => _selectedIndex = index);
       return;
     }
-
     setState(() => _selectedIndex = index);
     PhysioNavigation.replace(context, page);
   }
@@ -776,155 +743,18 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
     if (mounted) setState(() => _selectedIndex = 0);
   }
 
-  Future<void> _openAddPatient() async {
-    final patientWasAdded = await PhysioNavigation.push<bool>(context, const AddPatientScreen());
-    if (patientWasAdded == true) await _refreshDashboard();
-  }
-
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature is ready for the next frontend phase.'),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: kTextPrimary,
-      ),
-    );
-  }
-
-  BoxDecoration _cardDecoration() {
-    return BoxDecoration(
-      color: kCardBackground,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: kBorder),
-      boxShadow: [
-        BoxShadow(
-          color: const Color(0xFF123047).withValues(alpha: 0.045),
-          blurRadius: 16,
-          offset: const Offset(0, 5),
-        ),
-      ],
-    );
-  }
-
   String _getInitials(String name) {
     final clean = name.trim();
     if (clean.isEmpty) return 'DR';
     final parts = clean.split(RegExp(r'\s+'));
-    if (parts.length == 1) {
-      return parts.first.substring(0, parts.first.length > 1 ? 2 : 1).toUpperCase();
-    }
+    if (parts.length == 1) return parts.first.substring(0, parts.first.length > 1 ? 2 : 1).toUpperCase();
     return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
-  }
-
-  String _formatRevenue(double value) {
-    if (value >= 1000) return '₹${(value / 1000).toStringAsFixed(1)}k';
-    return '₹${value.toStringAsFixed(0)}';
   }
 
   String _formatDate(DateTime date) {
     const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     return '${weekdays[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} ${date.year}';
-  }
-}
-
-class _DashboardStat {
-  const _DashboardStat({
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.change,
-    required this.iconBackground,
-    required this.iconColor,
-    required this.changeColor,
-  });
-
-  final IconData icon;
-  final String title;
-  final String value;
-  final String change;
-  final Color iconBackground;
-  final Color iconColor;
-  final Color changeColor;
-}
-
-class StatCard extends StatelessWidget {
-  const StatCard({super.key, required this.stat});
-
-  final _DashboardStat stat;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: kBorder),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF123047).withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(9),
-            decoration: BoxDecoration(
-              color: stat.iconBackground,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(stat.icon, color: stat.iconColor, size: 20),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                stat.value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: kTextPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                stat.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: kTextSecondary,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                stat.change,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: stat.changeColor,
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -932,263 +762,123 @@ class _ScheduleRow extends StatelessWidget {
   const _ScheduleRow({
     required this.patient,
     required this.time,
-    required this.duration,
     required this.status,
+    required this.isFirst,
+    required this.isLast,
     required this.onTap,
   });
 
   final DashboardPatient patient;
   final String time;
-  final String duration;
   final String status;
+  final bool isFirst;
+  final bool isLast;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final timeParts = time.split(' ');
-    final statusColor = status == 'PENDING' ? kWarning : kSuccess;
+    final completed = status == 'Completed';
+    final starting = status == 'Starting Soon';
+    final color = completed ? kSuccess : starting ? kPrimaryCyan : kTextSecondary;
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                color: kPrimaryCyan,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    timeParts.isNotEmpty ? timeParts[0] : '--',
-                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800),
-                  ),
-                  if (timeParts.length > 1)
-                    Text(
-                      timeParts[1],
-                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            CircleAvatar(
-              radius: 19,
-              backgroundColor: kLightCyan,
-              child: Text(
-                patient.initials,
-                style: const TextStyle(color: kDarkCyan, fontSize: 11, fontWeight: FontWeight.w800),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    patient.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: kTextPrimary, fontSize: 13, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    patient.condition,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: kTextSecondary, fontSize: 11),
-                  ),
-                  if (duration.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        const Icon(Icons.schedule_rounded, size: 11, color: kTextSecondary),
-                        const SizedBox(width: 3),
-                        Text(duration, style: const TextStyle(color: kTextSecondary, fontSize: 10)),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 6),
-            if (status.isNotEmpty)
+        padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+        child: Row(children: [
+          SizedBox(width: 48, child: Text(time, textAlign: TextAlign.center, style: const TextStyle(color: kTextSecondary, fontSize: 10, fontWeight: FontWeight.w700))),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 20, height: 54,
+            child: Stack(alignment: Alignment.center, children: [
+              if (!isFirst) Positioned(top: 0, bottom: 27, child: Container(width: 1.2, color: kBorder)),
+              if (!isLast) Positioned(top: 27, bottom: 0, child: Container(width: 1.2, color: kBorder)),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Text(
-                  status.toLowerCase().capitalize(),
-                  style: TextStyle(color: statusColor, fontSize: 9.5, fontWeight: FontWeight.w800),
-                ),
+                width: 18, height: 18,
+                decoration: BoxDecoration(color: completed ? kSuccess : Colors.white, shape: BoxShape.circle, border: Border.all(color: color, width: 2)),
+                child: completed ? const Icon(Icons.check, color: Colors.white, size: 11) : null,
               ),
-            if (onTap != null) ...[
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_right_rounded, color: kTextSecondary, size: 20),
-            ],
-          ],
-        ),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(patient.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextPrimary, fontSize: 12.5, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 3),
+            Text(patient.condition, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSecondary, fontSize: 10.5)),
+          ])),
+          const SizedBox(width: 5),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+            decoration: BoxDecoration(color: color.withValues(alpha: .09), borderRadius: BorderRadius.circular(9)),
+            child: Text(status, style: TextStyle(color: color, fontSize: 8.3, fontWeight: FontWeight.w800)),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: kTextSecondary, size: 18),
+        ]),
       ),
     );
   }
 }
 
-class _AttentionItem extends StatelessWidget {
-  const _AttentionItem({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.subtitle,
-    required this.action,
-    required this.actionColor,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String subtitle;
-  final String action;
-  final Color actionColor;
+class _WatchlistRow extends StatelessWidget {
+  const _WatchlistRow({required this.patient, required this.color, required this.message, required this.onTap});
+  final DashboardPatient patient;
+  final Color color;
+  final String message;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.10),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: iconColor, size: 19),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(color: kTextPrimary, fontSize: 12.5, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 3),
-                  Text(subtitle, style: const TextStyle(color: kTextSecondary, fontSize: 10.5)),
-                ],
-              ),
-            ),
-            if (action.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: actionColor.withValues(alpha: 0.09),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(action, style: TextStyle(color: actionColor, fontSize: 9.5, fontWeight: FontWeight.w800)),
-              ),
-            const SizedBox(width: 3),
-            const Icon(Icons.chevron_right_rounded, color: kTextSecondary, size: 19),
-          ],
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(children: [
+          Container(width: 4, height: 45, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8))),
+          const SizedBox(width: 10),
+          CircleAvatar(radius: 19, backgroundColor: color.withValues(alpha: .10), child: Text(patient.initials, style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w800))),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(patient.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextPrimary, fontSize: 12, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 3),
+            Text(message, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSecondary, fontSize: 10)),
+          ])),
+          const Icon(Icons.chevron_right_rounded, color: kTextSecondary, size: 19),
+        ]),
       ),
     );
   }
 }
 
-class _QuickAction extends StatelessWidget {
-  const _QuickAction({required this.icon, required this.label, required this.color, required this.onTap});
-
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
+class _SkeletonCard extends StatelessWidget {
+  const _SkeletonCard({required this.height});
+  final double height;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: kBorder),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF123047).withValues(alpha: 0.035),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.10),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 21),
-              ),
-              const SizedBox(height: 7),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: kTextPrimary, fontSize: 10.5, fontWeight: FontWeight.w700),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return Container(
+      height: height,
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: kBorder)),
+      child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _SkeletonLine(width: 130, height: 13),
+        SizedBox(height: 14),
+        _SkeletonLine(width: double.infinity, height: 28),
+        SizedBox(height: 9),
+        _SkeletonLine(width: 210, height: 12),
+      ]),
     );
   }
 }
 
-class _OverviewMetric extends StatelessWidget {
-  const _OverviewMetric({required this.icon, required this.label, required this.value, required this.change, required this.color});
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final String change;
-  final Color color;
+class _SkeletonLine extends StatelessWidget {
+  const _SkeletonLine({required this.width, required this.height});
+  final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.10), shape: BoxShape.circle),
-          child: Icon(icon, color: color, size: 17),
-        ),
-        const SizedBox(height: 7),
-        Text(label, maxLines: 2, style: const TextStyle(color: kTextSecondary, fontSize: 9.5, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 2),
-        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextPrimary, fontSize: 17, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 2),
-        Text(change, style: const TextStyle(color: kSuccess, fontSize: 9, fontWeight: FontWeight.w700)),
-      ],
-    );
+    return Container(width: width, height: height, decoration: BoxDecoration(color: kLightCyan, borderRadius: BorderRadius.circular(8)));
   }
 }
 
@@ -1213,9 +903,7 @@ class DashboardPatient {
     final clean = name.trim();
     if (clean.isEmpty) return 'P';
     final parts = clean.split(RegExp(r'\s+'));
-    if (parts.length == 1) {
-      return parts.first.substring(0, parts.first.length > 1 ? 2 : 1).toUpperCase();
-    }
+    if (parts.length == 1) return parts.first.substring(0, parts.first.length > 1 ? 2 : 1).toUpperCase();
     return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 }
@@ -1226,19 +914,8 @@ class MoreScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('More Options'),
-        backgroundColor: kPrimaryCyan,
-        foregroundColor: Colors.white,
-      ),
+      appBar: AppBar(title: const Text('More Options'), backgroundColor: kPrimaryCyan, foregroundColor: Colors.white),
       body: const Center(child: Text('Clinic Settings & Reports')),
     );
-  }
-}
-
-extension _StringCapitalization on String {
-  String capitalize() {
-    if (isEmpty) return this;
-    return '${this[0].toUpperCase()}${substring(1)}';
   }
 }
