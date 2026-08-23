@@ -6,7 +6,6 @@ import '../../services/pdf_invoice_service.dart';
 import '../physio/physio_dashboard.dart';
 
 const Color _kPageBg = Color(0xFFF4F9FA);
-const Color _kCardBg = Colors.white;
 const Color _kBorder = Color(0xFFD9E7EA);
 const Color _kMint = Color(0xFF08A7B5);
 const Color _kTextPrimary = Color(0xFF102A43);
