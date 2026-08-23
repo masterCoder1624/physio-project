@@ -271,7 +271,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: filters.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (_, index) {
           final filter = filters[index];
           final selected = _filter == filter;

@@ -37,7 +37,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
   bool _isLoading = true;
   String _selectedFilter = 'All';
   String _sortBy = 'Default';
-  int _navIndex = 1;
+  final int _navIndex = 1;
   Timer? _searchDebounce;
 
   @override

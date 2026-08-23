@@ -44,9 +44,9 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
   String _physioName = 'Dr. Alex';
   String _specialty = 'Sports & Orthopedic Physiotherapy';
   int _todayPatientsCount = 0;
-  int _pendingBookingsCount = 0;
-  int _completedThisWeek = 0;
-  double _monthlyRevenue = 0;
+  final int _pendingBookingsCount = 0;
+  final int _completedThisWeek = 0;
+  final double _monthlyRevenue = 0;
   List<DashboardPatient> _todayPatients = [];
   int _selectedIndex = 0;
 

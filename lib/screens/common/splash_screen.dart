@@ -1,96 +1,147 @@
-import 'package:firebase_core/firebase_core.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../onboarding/welcome_screen.dart';
+import '../auth/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
-  final Future<FirebaseApp> firebaseReady;
-
-  const SplashScreen({
-    super.key,
-    required this.firebaseReady,
-  });
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _animationController;
+    with TickerProviderStateMixin {
+  late final AnimationController _entranceController;
+  late final AnimationController _loadingController;
+  late final AnimationController _pulseController;
 
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _scaleAnimation;
+
+  Timer? _statusTimer;
+
+  int _statusIndex = 0;
+
+  final List<String> _loadingMessages = [
+    'Preparing your practice',
+    'Loading your workspace',
+    'Setting up appointments',
+    'Almost ready',
+  ];
+
+  static const Color _background = Color(0xFFF2FAFA);
+  static const Color _teal = Color(0xFF08A5A0);
+  static const Color _darkText = Color(0xFF12324A);
+  static const Color _mutedText = Color(0xFF78909C);
+  static const Color _trackColor = Color(0xFFD5EEEE);
 
   @override
   void initState() {
     super.initState();
 
-    _animationController = AnimationController(
+    // ------------------------------------------------------------
+    // SPLASH ENTRANCE ANIMATION
+    // ------------------------------------------------------------
+
+    _entranceController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
 
     _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
+      parent: _entranceController,
+      curve: Curves.easeOutCubic,
     );
 
     _scaleAnimation = Tween<double>(
-      begin: 1.04,
+      begin: 0.96,
       end: 1.0,
     ).animate(
       CurvedAnimation(
-        parent: _animationController,
+        parent: _entranceController,
         curve: Curves.easeOutCubic,
       ),
     );
 
-    _animationController.forward();
+    _entranceController.forward();
 
-    _startSplash();
+    // ------------------------------------------------------------
+    // LOADING ANIMATION
+    // ------------------------------------------------------------
+
+    _loadingController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3200),
+    );
+
+    _loadingController.forward();
+
+    // ------------------------------------------------------------
+    // SUBTLE PULSE ANIMATION
+    // ------------------------------------------------------------
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+      lowerBound: 0.97,
+      upperBound: 1.03,
+    )..repeat(reverse: true);
+
+    // ------------------------------------------------------------
+    // CHANGE LOADING MESSAGE
+    // ------------------------------------------------------------
+
+    _statusTimer = Timer.periodic(
+      const Duration(milliseconds: 800),
+      (timer) {
+        if (!mounted) return;
+
+        setState(() {
+          if (_statusIndex < _loadingMessages.length - 1) {
+            _statusIndex++;
+          }
+        });
+      },
+    );
+
+    // ------------------------------------------------------------
+    // GO TO LOGIN
+    // ------------------------------------------------------------
+
+    Future.delayed(
+      const Duration(milliseconds: 3500),
+      _openLogin,
+    );
   }
 
-  Future<void> _startSplash() async {
-    try {
-      await Future.wait([
-        widget.firebaseReady,
-        Future.delayed(
-          const Duration(seconds: 3),
-        ),
-      ]);
-    } catch (e) {
-      // Keep the splash visible briefly even if Firebase
-      // initialization fails.
-      await Future.delayed(
-        const Duration(milliseconds: 500),
-      );
-    }
-
+  void _openLogin() {
     if (!mounted) return;
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (
-          context,
-          animation,
-          secondaryAnimation,
+          BuildContext context,
+          Animation<double> animation,
+          Animation<double> secondaryAnimation,
         ) {
-          return const WelcomeScreen();
+          return const LoginScreen();
         },
-        transitionDuration: const Duration(
-          milliseconds: 600,
-        ),
-        reverseTransitionDuration: Duration.zero,
+        transitionDuration: const Duration(milliseconds: 700),
+        reverseTransitionDuration: const Duration(milliseconds: 400),
         transitionsBuilder: (
-          context,
-          animation,
-          secondaryAnimation,
-          child,
+          BuildContext context,
+          Animation<double> animation,
+          Animation<double> secondaryAnimation,
+          Widget child,
         ) {
           return FadeTransition(
-            opacity: animation,
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ),
             child: child,
           );
         },
@@ -100,7 +151,12 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _statusTimer?.cancel();
+
+    _entranceController.dispose();
+    _loadingController.dispose();
+    _pulseController.dispose();
+
     super.dispose();
   }
 
@@ -111,124 +167,300 @@ class _SplashScreenState extends State<SplashScreen>
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
         statusBarBrightness: Brightness.light,
-        systemNavigationBarColor: Color(0xFFF2FAFA),
+        systemNavigationBarColor: Colors.white,
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: Scaffold(
-        backgroundColor: const Color(0xFFF2FAFA),
+        backgroundColor: _background,
         body: SafeArea(
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final screenHeight = constraints.maxHeight;
+          child: Stack(
+            children: [
+              // ============================================================
+              // BACKGROUND DECORATIONS
+              // ============================================================
 
-                return Column(
-                  children: [
-                    const Spacer(),
+              Positioned(
+                top: -90,
+                left: -90,
+                child: _backgroundCircle(
+                  size: 250,
+                  opacity: 0.07,
+                ),
+              ),
 
-                    // --------------------------------------------------
-                    // SPLASH IMAGE
-                    // --------------------------------------------------
-                    ScaleTransition(
-                      scale: _scaleAnimation,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(30),
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: screenHeight * 0.62,
-                            child: Image.asset(
-                              'assets/images/physiosoft_splash_screen.png',
-                              fit: BoxFit.cover,
+              Positioned(
+                top: 100,
+                right: -110,
+                child: _backgroundCircle(
+                  size: 230,
+                  opacity: 0.045,
+                ),
+              ),
 
-                              // If the path is wrong, this prevents
-                              // the red Flutter error screen.
-                              errorBuilder: (
-                                context,
-                                error,
-                                stackTrace,
-                              ) {
-                                return Container(
-                                  color: const Color(0xFFF2FAFA),
-                                  alignment: Alignment.center,
-                                  child: const Text(
-                                    'Splash image unavailable',
-                                    style: TextStyle(
-                                      color: Color(0xFF6B7C93),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
+              Positioned(
+                bottom: -120,
+                right: -100,
+                child: _backgroundCircle(
+                  size: 270,
+                  opacity: 0.065,
+                ),
+              ),
+
+              // ============================================================
+              // MAIN CONTENT
+              // ============================================================
+
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: ScaleTransition(
+                  scale: _scaleAnimation,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 16),
+
+                      // ----------------------------------------------------
+                      // HERO IMAGE
+                      // ----------------------------------------------------
+
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 28,
                           ),
-                        ),
-                      ),
-                    ),
-
-                    const Spacer(),
-
-                    // --------------------------------------------------
-                    // LOADING TEXT
-                    // --------------------------------------------------
-                    const Text(
-                      'Preparing your practice',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Color(0xFF17324D),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // --------------------------------------------------
-                    // PROGRESS BAR
-                    // --------------------------------------------------
-                    TweenAnimationBuilder<double>(
-                      tween: Tween<double>(
-                        begin: 0,
-                        end: 1,
-                      ),
-                      duration: const Duration(seconds: 3),
-                      curve: Curves.easeInOut,
-                      builder: (
-                        context,
-                        value,
-                        child,
-                      ) {
-                        return SizedBox(
-                          width: 150,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: LinearProgressIndicator(
-                              value: value,
-                              minHeight: 5,
-                              backgroundColor:
-                                  const Color(0xFFD8EEEE),
-                              valueColor:
-                                  const AlwaysStoppedAnimation<Color>(
-                                Color(0xFF0AA6A3),
+                          child: Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(34),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _teal.withValues(alpha: 0.06),
+                                  blurRadius: 30,
+                                  offset: const Offset(0, 12),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(34),
+                              child: Image.asset(
+                                'assets/images/physiosoft_splash_screen.png',
+                                width: double.infinity,
+                                height: double.infinity,
+                                fit: BoxFit.contain,
+                                errorBuilder: (
+                                  context,
+                                  error,
+                                  stackTrace,
+                                ) {
+                                  return _imageError();
+                                },
                               ),
                             ),
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      ),
 
-                    const Spacer(),
-                  ],
-                );
-              },
-            ),
+                      const SizedBox(height: 8),
+
+                      // ----------------------------------------------------
+                      // LOADING SECTION
+                      // ----------------------------------------------------
+
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          32,
+                          0,
+                          32,
+                          26,
+                        ),
+                        child: Column(
+                          children: [
+                            // Animated loading message
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              transitionBuilder: (
+                                Widget child,
+                                Animation<double> animation,
+                              ) {
+                                return FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                );
+                              },
+                              child: Text(
+                                _loadingMessages[_statusIndex],
+                                key: ValueKey(_statusIndex),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: _darkText,
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            // Progress bar
+                            AnimatedBuilder(
+                              animation: _loadingController,
+                              builder: (context, child) {
+                                final progress =
+                                    _loadingController.value;
+
+                                return Column(
+                                  children: [
+                                    Container(
+                                      width: 260,
+                                      height: 7,
+                                      decoration: BoxDecoration(
+                                        color: _trackColor,
+                                        borderRadius:
+                                            BorderRadius.circular(20),
+                                      ),
+                                      child: Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: FractionallySizedBox(
+                                          widthFactor: progress,
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: _teal,
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: _teal.withValues(
+                                                    alpha: 0.20,
+                                                  ),
+                                                  blurRadius: 8,
+                                                  offset:
+                                                      const Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+
+                                    const SizedBox(height: 9),
+
+                                    // Percentage
+                                    Text(
+                                      '${(progress * 100).round()}%',
+                                      style: const TextStyle(
+                                        color: _mutedText,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            // Animated dots
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _dot(0),
+                                const SizedBox(width: 6),
+                                _dot(1),
+                                const SizedBox(width: 6),
+                                _dot(2),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // BACKGROUND CIRCLE
+  // ============================================================
+
+  Widget _backgroundCircle({
+    required double size,
+    required double opacity,
+  }) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: _teal.withValues(alpha: opacity),
+      ),
+    );
+  }
+
+  // ============================================================
+  // ANIMATED DOT
+  // ============================================================
+
+  Widget _dot(int index) {
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) {
+        final delay = index * 0.12;
+
+        final value =
+            ((_pulseController.value - 0.97) / 0.06 - delay)
+                .clamp(0.0, 1.0);
+
+        return Container(
+          width: 7 + (value * 2),
+          height: 7 + (value * 2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: index == 0
+                ? _teal
+                : _teal.withValues(alpha: 0.25),
+          ),
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // IMAGE ERROR
+  // ============================================================
+
+  Widget _imageError() {
+    return Container(
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(34),
+      ),
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.image_not_supported_outlined,
+            size: 44,
+            color: _mutedText,
+          ),
+          SizedBox(height: 12),
+          Text(
+            'Unable to load splash image',
+            style: TextStyle(
+              color: _mutedText,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

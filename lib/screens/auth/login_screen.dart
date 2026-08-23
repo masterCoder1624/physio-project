@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
+
 import '../../services/auth_service.dart';
-import '../physio/physio_main_shell.dart';
+import '../patient/add_patient_screen.dart';
 import '../patient/patient_dashboard.dart';
 import 'signup_screen.dart';
 
-const _loginBlue = Color(0xFF10B981);
-const _loginBackground = Color(0xFF0F1F17);
-const _loginBorder = Color(0xFF254B37);
-const _loginText = Color(0xFFF8FAFC);
-const _loginMuted = Color(0xFFA7F3D0);
+const Color _primary = Color(0xFF009E9A);
+const Color _background = Color(0xFFF2FBFC);
+const Color _darkText = Color(0xFF12324A);
+const Color _mutedText = Color(0xFF71849A);
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,48 +17,93 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
   bool _isPhysio = true;
   bool _obscurePassword = true;
   bool _isSigningIn = false;
+
+  late final AnimationController _animationController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..forward();
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
+  // ============================================================
+  // REAL LOGIN
+  // Uses your existing AuthService().login()
+  // ============================================================
+
   Future<void> _signIn() async {
-    if (_isSigningIn || !(_formKey.currentState?.validate() ?? false)) {
+    if (_isSigningIn) return;
+
+    FocusScope.of(context).unfocus();
+
+    if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }
 
-    FocusScope.of(context).unfocus();
     setState(() => _isSigningIn = true);
+
     try {
       final user = await AuthService().login(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+
       if (!mounted) return;
-      
-      final isPhysioUser = user.role.contains('physio') || _isPhysio;
+
+      // Keep the existing project navigation.
+      final isPhysioUser =
+          user.role.toLowerCase().contains('physio') || _isPhysio;
+
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (_) => isPhysioUser ? const PhysioMainShell() : const PatientDashboard(),
+          builder: (_) => isPhysioUser
+              ? const AddPatientScreen(isFirstTimeLogin: true)
+              : const PatientDashboard(),
         ),
         (route) => false,
       );
     } catch (error) {
       if (!mounted) return;
+
+      final message = error
+          .toString()
+          .replaceFirst('Exception: ', '')
+          .trim();
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(error.toString().replaceAll('Exception: ', '')),
-          backgroundColor: const Color(0xFFE74C3C),
+          content: Text(
+            message.isEmpty
+                ? 'Unable to sign in. Please check your details.'
+                : message,
+          ),
+          backgroundColor: const Color(0xFFD64545),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       );
     } finally {
@@ -68,519 +113,678 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // ============================================================
+  // REAL CREATE ACCOUNT NAVIGATION
+  // Opens your existing signup_screen.dart
+  // ============================================================
 
-  void _showUnavailableMessage(String provider) {
+  void _createAccount() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const SignupScreen(),
+      ),
+    );
+  }
+
+  void _forgotPassword() {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$provider sign-in is not available yet.')),
+      const SnackBar(
+        content: Text(
+          'Password reset is not connected to the current backend yet.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _googleUnavailable() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Google sign-in is not connected yet.'),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final fade = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    );
+
     return Scaffold(
-      backgroundColor: _loginBackground,
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: Container(
-              color: _loginBackground,
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    const _LoginHero(),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(17, 24, 17, 28),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildRoleSelector(),
-                            const SizedBox(height: 18),
-                            _buildLabel('Email address'),
-                            const SizedBox(height: 7),
-                            TextFormField(
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              textInputAction: TextInputAction.next,
-                              decoration: _inputDecoration(
-                                hintText: 'you@example.com',
-                                prefixIcon: Icons.person_outline_rounded,
-                              ),
-                              validator: (value) {
-                                final email = value?.trim() ?? '';
-                                if (email.isEmpty || !email.contains('@')) {
-                                  return 'Enter a valid email address.';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            _buildLabel('Password'),
-                            const SizedBox(height: 7),
-                            TextFormField(
-                              controller: _passwordController,
-                              obscureText: _obscurePassword,
-                              textInputAction: TextInputAction.done,
-                              onFieldSubmitted: (_) => _signIn(),
-                              decoration: _inputDecoration(
-                                hintText: 'Enter your password',
-                                prefixIcon: Icons.lock_outline_rounded,
-                                suffix: IconButton(
-                                  onPressed: () => setState(
-                                    () => _obscurePassword = !_obscurePassword,
-                                  ),
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                    size: 18,
-                                    color: _loginMuted,
-                                  ),
-                                ),
-                              ),
-                              validator: (value) {
-                                if ((value?.length ?? 0) < 6) {
-                                  return 'Password must be at least 6 characters.';
-                                }
-                                return null;
-                              },
-                            ),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: () =>
-                                    _showUnavailableMessage('Password reset'),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: _loginBlue,
-                                  padding: const EdgeInsets.only(
-                                    top: 8,
-                                    bottom: 10,
-                                  ),
-                                  minimumSize: Size.zero,
-                                ),
-                                child: const Text(
-                                  'Forgot password?',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(
-                              height: 43,
-                              child: FilledButton(
-                                onPressed: _isSigningIn ? null : _signIn,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: _loginBlue,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(7),
-                                  ),
-                                ),
-                                child: _isSigningIn
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Sign in',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            const _DividerLabel(label: 'or continue with'),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _SocialButton(
-                                    label: 'Google',
-                                    icon: const Text(
-                                      'G',
-                                      style: TextStyle(
-                                        color: Color(0xFF4285F4),
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    onPressed: () =>
-                                        _showUnavailableMessage('Google'),
-                                  ),
-                                ),
-                                const SizedBox(width: 9),
-                                Expanded(
-                                  child: _SocialButton(
-                                    label: 'WhatsApp',
-                                    icon: const Icon(
-                                      Icons.chat_bubble_outline,
-                                      size: 15,
-                                      color: Color(0xFF7E57C2),
-                                    ),
-                                    onPressed: () =>
-                                        _showUnavailableMessage('WhatsApp'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 17),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Text(
-                                  "Don't have an account? ",
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: _loginMuted,
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const SignupScreen(),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Sign up',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: _loginBlue,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+      backgroundColor: _background,
+      resizeToAvoidBottomInset: true,
+      body: Stack(
+        children: [
+          const Positioned(
+            top: -120,
+            left: -100,
+            child: _Circle(
+              size: 320,
+              color: Color(0xFFDDF4F4),
+            ),
+          ),
+          const Positioned(
+            top: 100,
+            right: -145,
+            child: _Circle(
+              size: 300,
+              color: Color(0xFFE4F8F8),
+            ),
+          ),
+          const Positioned(
+            bottom: -110,
+            right: -80,
+            child: _Circle(
+              size: 250,
+              color: Color(0xFFDDF5F5),
+            ),
+          ),
+
+          SafeArea(
+            child: FadeTransition(
+              opacity: fade,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, .035),
+                  end: Offset.zero,
+                ).animate(fade),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final wide = constraints.maxWidth >= 850;
+
+                    return SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: wide ? 42 : 18,
+                        vertical: 18,
+                      ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxWidth: 1120,
+                          ),
+                          child: wide
+                              ? _buildWideLayout()
+                              : _buildMobileLayout(),
                         ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildHero(),
+        const SizedBox(height: 22),
+        _buildLoginCard(),
+        const SizedBox(height: 18),
+        _buildFooter(),
+      ],
+    );
+  }
+
+  Widget _buildWideLayout() {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 25),
+      padding: const EdgeInsets.all(34),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(.78),
+        borderRadius: BorderRadius.circular(34),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(.06),
+            blurRadius: 35,
+            offset: const Offset(0, 18),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _buildHero()),
+          const SizedBox(width: 38),
+          Expanded(child: _buildLoginCard()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHero() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 4),
+        const Text(
+          'Welcome Back 👋',
+          style: TextStyle(
+            color: _darkText,
+            fontSize: 31,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -.7,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Sign in to continue managing\nyour practice.',
+          style: TextStyle(
+            color: _mutedText,
+            fontSize: 17,
+            height: 1.5,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 22),
+
+        // IMPORTANT:
+        // This is the LOGIN image, not the splash image.
+        ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Container(
+            height: 300,
+            width: double.infinity,
+            color: const Color(0xFFEAF8F8),
+            child: Image.asset(
+              'assets/images/physiosoft_login_illustration.png',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) {
+                return const Center(
+                  child: Icon(
+                    Icons.medical_services_outlined,
+                    color: _primary,
+                    size: 72,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+
+      ],
+    );
+  }
+
+  Widget _buildLoginCard() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 25, 22, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: Colors.white,
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0B5960).withOpacity(.09),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
+          ),
+        ],
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Sign in to PhysioSoft',
+              style: TextStyle(
+                color: _darkText,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 5),
+            const Text(
+              'Access your practice dashboard securely.',
+              style: TextStyle(
+                color: _mutedText,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            _roleSelector(),
+
+            const SizedBox(height: 20),
+
+            _fieldLabel(
+              Icons.mail_outline_rounded,
+              'Email Address',
+            ),
+            const SizedBox(height: 8),
+
+            TextFormField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autocorrect: false,
+              decoration: _inputDecoration(
+                'Enter your email',
+                Icons.mail_outline_rounded,
+              ),
+              validator: (value) {
+                final email = value?.trim() ?? '';
+
+                if (email.isEmpty) {
+                  return 'Please enter your email';
+                }
+
+                final validEmail = RegExp(
+                  r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                ).hasMatch(email);
+
+                if (!validEmail) {
+                  return 'Please enter a valid email';
+                }
+
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 18),
+
+            _fieldLabel(
+              Icons.lock_outline_rounded,
+              'Password',
+            ),
+            const SizedBox(height: 8),
+
+            TextFormField(
+              controller: _passwordController,
+              obscureText: _obscurePassword,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _signIn(),
+              decoration: _inputDecoration(
+                'Enter your password',
+                Icons.lock_outline_rounded,
+              ).copyWith(
+                suffixIcon: IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    color: const Color(0xFF527083),
+                  ),
+                ),
+              ),
+              validator: (value) {
+                if ((value ?? '').isEmpty) {
+                  return 'Please enter your password';
+                }
+
+                if ((value ?? '').length < 6) {
+                  return 'Password must be at least 6 characters';
+                }
+
+                return null;
+              },
+            ),
+
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _forgotPassword,
+                style: TextButton.styleFrom(
+                  foregroundColor: _primary,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 2,
+                    vertical: 7,
+                  ),
+                ),
+                child: const Text(
+                  'Forgot Password?',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 5),
+
+            SizedBox(
+              height: 56,
+              child: ElevatedButton(
+                onPressed: _isSigningIn ? null : _signIn,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _primary,
+                  disabledBackgroundColor: _primary.withOpacity(.55),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(17),
+                  ),
+                ),
+                child: _isSigningIn
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                    : const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Sign In',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 23,
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            Row(
+              children: [
+                Expanded(
+                  child: Divider(
+                    color: const Color(0xFFB9C9D5).withOpacity(.7),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 13),
+                  child: Text(
+                    'or',
+                    style: TextStyle(
+                      color: _mutedText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Divider(
+                    color: const Color(0xFFB9C9D5).withOpacity(.7),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 17),
+
+            SizedBox(
+              height: 54,
+              child: OutlinedButton(
+                onPressed: _isSigningIn ? null : _googleUnavailable,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _darkText,
+                  side: const BorderSide(
+                    color: Color(0xFFD9E5EC),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(17),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'G',
+                      style: TextStyle(
+                        color: Color(0xFF4285F4),
+                        fontSize: 23,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      'Continue with Google',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
 
-  Widget _buildRoleSelector() {
-    return Container(
-      height: 35,
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEEF2F6),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        children: [
-          _RoleOption(
-            label: "I'm a Physio",
-            selected: _isPhysio,
-            onTap: () => setState(() => _isPhysio = true),
-          ),
-          _RoleOption(
-            label: "I'm a Patient",
-            selected: !_isPhysio,
-            onTap: () => setState(() => _isPhysio = false),
-          ),
-        ],
-      ),
-    );
-  }
+            const SizedBox(height: 21),
 
-  Widget _buildLabel(String label) {
-    return Text(
-      label,
-      style: const TextStyle(
-        fontSize: 10,
-        fontWeight: FontWeight.w600,
-        color: _loginText,
-      ),
-    );
-  }
+            const Text(
+              'New to PhysioSoft?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: _mutedText,
+                fontSize: 14,
+              ),
+            ),
 
-  InputDecoration _inputDecoration({
-    required String hintText,
-    required IconData prefixIcon,
-    Widget? suffix,
-  }) {
-    final border = OutlineInputBorder(
-      borderSide: const BorderSide(color: _loginBorder),
-      borderRadius: BorderRadius.circular(6),
-    );
-    return InputDecoration(
-      hintText: hintText,
-      hintStyle: const TextStyle(color: Color(0xFF9AA9B8), fontSize: 11),
-      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-      prefixIcon: Icon(prefixIcon, size: 16, color: _loginMuted),
-      suffixIcon: suffix,
-      enabledBorder: border,
-      focusedBorder: border.copyWith(
-        borderSide: const BorderSide(color: _loginBlue, width: 1.3),
-      ),
-      errorBorder: border.copyWith(
-        borderSide: const BorderSide(color: Color(0xFFE74C3C)),
-      ),
-      focusedErrorBorder: border.copyWith(
-        borderSide: const BorderSide(color: Color(0xFFE74C3C)),
-      ),
-    );
-  }
-}
+            const SizedBox(height: 3),
 
-class _LoginHero extends StatelessWidget {
-  const _LoginHero();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 182,
-      width: double.infinity,
-      color: _loginBlue,
-      child: Stack(
-        clipBehavior: Clip.hardEdge,
-        children: [
-          const Positioned(top: -88, right: -35, child: _HeroCircle(size: 192)),
-          const Positioned(
-            bottom: -45,
-            left: -21,
-            child: _HeroCircle(size: 135),
-          ),
-          const Positioned(top: 13, right: 12, child: _LoginPill()),
-          Center(
-            child: Transform.translate(
-              offset: const Offset(0, 15),
-              child: const Column(
+            TextButton(
+              onPressed: _createAccount,
+              style: TextButton.styleFrom(
+                foregroundColor: _primary,
+              ),
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _PvMark(),
-                  SizedBox(height: 16),
                   Text(
-                    'Welcome back',
+                    'Create Account',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 21,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  SizedBox(height: 7),
-                  Text(
-                    'Sign in to continue to PhysioVerse',
-                    style: TextStyle(color: Colors.white, fontSize: 11),
+                  SizedBox(width: 7),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 20,
                   ),
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PvMark extends StatelessWidget {
-  const _PvMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 47,
-      height: 47,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.white24,
-        borderRadius: BorderRadius.circular(13),
-      ),
-      child: const Text(
-        'PV',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 17,
-          fontWeight: FontWeight.w800,
+          ],
         ),
       ),
     );
   }
-}
 
-class _HeroCircle extends StatelessWidget {
-  const _HeroCircle({required this.size});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _roleSelector() {
     return Container(
-      width: size,
-      height: size,
-      decoration: const BoxDecoration(
-        color: Color(0x332A88DE),
-        shape: BoxShape.circle,
-      ),
-    );
-  }
-}
-
-class _LoginPill extends StatelessWidget {
-  const _LoginPill();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      height: 45,
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFF0874D8),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33004488),
-            blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
-        ],
+        color: const Color(0xFFF0F5F7),
+        borderRadius: BorderRadius.circular(14),
       ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-          Icon(Icons.circle, size: 5, color: Colors.white),
-          SizedBox(width: 6),
-          Text(
-            'Login',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
+          Expanded(
+            child: _roleButton(
+              text: "I'm a Physio",
+              selected: _isPhysio,
+              onTap: () => setState(() => _isPhysio = true),
             ),
           ),
-          SizedBox(width: 4),
-          Icon(
-            Icons.keyboard_arrow_down_rounded,
-            size: 13,
-            color: Colors.white,
+          Expanded(
+            child: _roleButton(
+              text: "I'm a Patient",
+              selected: !_isPhysio,
+              onTap: () => setState(() => _isPhysio = false),
+            ),
           ),
         ],
       ),
     );
   }
-}
 
-class _RoleOption extends StatelessWidget {
-  const _RoleOption({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Material(
-        color: selected ? Colors.white : Colors.transparent,
-        borderRadius: BorderRadius.circular(5),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(5),
-          child: Container(
-            alignment: Alignment.center,
-            decoration: selected
-                ? BoxDecoration(
-                    borderRadius: BorderRadius.circular(5),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x220E355C),
-                        blurRadius: 3,
-                        offset: Offset(0, 1),
-                      ),
-                    ],
-                  )
-                : null,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: selected ? _loginBlue : _loginMuted,
-                fontSize: 10,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              ),
+  Widget _roleButton({
+    required String text,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: selected ? Colors.white : Colors.transparent,
+      borderRadius: BorderRadius.circular(11),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(11),
+        child: Center(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: selected ? _primary : _mutedText,
+              fontSize: 12,
+              fontWeight:
+                  selected ? FontWeight.w800 : FontWeight.w600,
             ),
           ),
         ),
       ),
     );
   }
-}
 
-class _DividerLabel extends StatelessWidget {
-  const _DividerLabel({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _fieldLabel(IconData icon, String title) {
     return Row(
       children: [
-        const Expanded(child: Divider(color: _loginBorder)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 9),
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 9, color: _loginMuted),
+        Container(
+          width: 37,
+          height: 37,
+          decoration: BoxDecoration(
+            color: _primary.withOpacity(.10),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Icon(
+            icon,
+            color: _primary,
+            size: 20,
           ),
         ),
-        const Expanded(child: Divider(color: _loginBorder)),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: const TextStyle(
+            color: _darkText,
+            fontSize: 14.5,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       ],
     );
   }
+
+  InputDecoration _inputDecoration(
+    String hint,
+    IconData icon,
+  ) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(
+        color: Color(0xFF91A2B5),
+        fontSize: 14,
+      ),
+      prefixIcon: Icon(
+        icon,
+        color: _primary,
+        size: 21,
+      ),
+      filled: true,
+      fillColor: const Color(0xFFFCFEFF),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 15,
+        vertical: 16,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(
+          color: Color(0xFFDCE7EE),
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(
+          color: Color(0xFFDCE7EE),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(
+          color: _primary,
+          width: 1.6,
+        ),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(
+          color: Color(0xFFE57373),
+        ),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(
+          color: Color(0xFFE57373),
+          width: 1.4,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFooter() {
+    return const Text(
+      'Secure access • Professional care • Better outcomes',
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: _mutedText,
+        fontSize: 11.5,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
 }
 
-class _SocialButton extends StatelessWidget {
-  const _SocialButton({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-  });
+class _Circle extends StatelessWidget {
+  final double size;
+  final Color color;
 
-  final String label;
-  final Widget icon;
-  final VoidCallback onPressed;
+  const _Circle({
+    required this.size,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 33,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: _loginText,
-          side: const BorderSide(color: _loginBorder),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            icon,
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-            ),
-          ],
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
         ),
       ),
     );

@@ -321,7 +321,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                       _buildLabel('Clinical Notes', icon: Icons.notes_rounded),
                       ValueListenableBuilder<TextEditingValue>(
                         valueListenable: _notesController,
-                        builder: (_, value, __) => Text(
+                        builder: (_, value, _) => Text(
                           '${value.text.length}/250',
                           style: const TextStyle(color: _kTextMuted, fontSize: 11, fontWeight: FontWeight.w600),
                         ),
