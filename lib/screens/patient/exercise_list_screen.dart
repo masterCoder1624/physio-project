@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../constants/patient_theme.dart';
+import '../../models/exercise_model.dart';
+import '../../services/exercise_service.dart';
 import 'exercise_detail_screen.dart';
 import 'patient_components.dart';
 
-/// Screen 8 — Today's Plan / Exercise List Screen (matching media_1787385006975.jpg)
+/// Screen 8 — Today's Plan / Exercise List Screen (matching UI)
 class ExerciseListScreen extends StatefulWidget {
   const ExerciseListScreen({super.key});
 
@@ -12,118 +14,88 @@ class ExerciseListScreen extends StatefulWidget {
 }
 
 class _ExerciseListScreenState extends State<ExerciseListScreen> {
-  int _selectedTabIndex = 0; // 0: Today, 1: Upcoming, 2: Completed
+  final ExerciseService _exerciseService = ExerciseService();
+  int _selectedTabIndex = 0; // 0: All, 1: Upcoming, 2: Completed
+  bool _isLoading = true;
+  List<PatientExerciseAssignmentModel> _exercises = [];
 
-  final List<Map<String, dynamic>> _exercises = [
-    {
-      'name': 'Bridge Exercise',
-      'target': 'Glutes • Lower Body',
-      'sets': '3',
-      'reps': '12',
-      'duration': '10 min',
-      'isCompleted': true,
-      'icon': Icons.accessibility_new_rounded,
-    },
-    {
-      'name': 'Wall Squat',
-      'target': 'Quadriceps • Knee Stability',
-      'sets': '3',
-      'reps': '15',
-      'duration': '15 min',
-      'isCompleted': true,
-      'icon': Icons.fitness_center_rounded,
-    },
-    {
-      'name': 'Leg Raise',
-      'target': 'Hip Flexors • Core',
-      'sets': '3',
-      'reps': '12',
-      'duration': '10 min',
-      'isCompleted': false,
-      'icon': Icons.airline_seat_legroom_extra_rounded,
-    },
-    {
-      'name': 'Hamstring Stretch',
-      'target': 'Hamstrings • Flexibility',
-      'sets': '3',
-      'reps': '30 sec',
-      'duration': '5 min',
-      'isCompleted': false,
-      'icon': Icons.self_improvement_rounded,
-    },
-    {
-      'name': 'Calf Raises',
-      'target': 'Calves • Ankle Stability',
-      'sets': '3',
-      'reps': '15',
-      'duration': '8 min',
-      'isCompleted': false,
-      'icon': Icons.directions_walk_rounded,
-    },
-    {
-      'name': 'Ankle Circles',
-      'target': 'Ankle Mobility',
-      'sets': '2',
-      'reps': '20',
-      'duration': '5 min',
-      'isCompleted': true,
-      'icon': Icons.rotate_right_rounded,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadTodayPlan();
+  }
 
-  List<Map<String, dynamic>> get _filteredExercises {
+  Future<void> _loadTodayPlan() async {
+    setState(() => _isLoading = true);
+    try {
+      final plan = await _exerciseService.getTodayPlan();
+      if (!mounted) return;
+      setState(() {
+        _exercises = plan.exercises;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
+  }
+
+  List<PatientExerciseAssignmentModel> get _filteredExercises {
     if (_selectedTabIndex == 1) {
-      return _exercises.where((e) => !(e['isCompleted'] as bool)).toList();
+      return _exercises.where((e) => !e.isCompletedToday).toList();
     } else if (_selectedTabIndex == 2) {
-      return _exercises.where((e) => e['isCompleted'] as bool).toList();
+      return _exercises.where((e) => e.isCompletedToday).toList();
     }
     return _exercises;
   }
 
-  void _openExercise(int index) async {
-    final ex = _filteredExercises[index];
+  void _openExercise(PatientExerciseAssignmentModel ex) async {
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => ExerciseDetailScreen(
-          exerciseName: ex['name'] as String,
-          targetArea: ex['target'] as String,
-          sets: ex['sets'] as String,
-          reps: ex['reps'] as String,
-          duration: ex['duration'] as String,
-          isInitiallyCompleted: ex['isCompleted'] as bool,
+          assignmentId: ex.id,
+          exerciseName: ex.exerciseTitle,
+          targetArea: ex.bodyPart,
+          sets: '${ex.sets}',
+          reps: '${ex.reps}',
+          duration: ex.duration,
+          isInitiallyCompleted: ex.isCompletedToday,
+          instructions: ex.instructions,
         ),
       ),
     );
 
-    if (result != null) {
+    if (result != null && mounted) {
       setState(() {
-        ex['isCompleted'] = result;
+        ex.isCompletedToday = result;
       });
+      _loadTodayPlan();
     }
   }
 
   void _startNextExercise() {
     final nextPending = _exercises.firstWhere(
-      (e) => !(e['isCompleted'] as bool),
-      orElse: () => _exercises.first,
+      (e) => !e.isCompletedToday,
+      orElse: () => _exercises.isNotEmpty
+          ? _exercises.first
+          : PatientExerciseAssignmentModel(
+              id: '',
+              patientId: '',
+              physiotherapistId: '',
+              exerciseId: '',
+              exerciseTitle: 'Exercise',
+              startDate: '',
+            ),
     );
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ExerciseDetailScreen(
-          exerciseName: nextPending['name'] as String,
-          targetArea: nextPending['target'] as String,
-          sets: nextPending['sets'] as String,
-          reps: nextPending['reps'] as String,
-          duration: nextPending['duration'] as String,
-          isInitiallyCompleted: nextPending['isCompleted'] as bool,
-        ),
-      ),
-    );
+
+    if (nextPending.id.isNotEmpty) {
+      _openExercise(nextPending);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final completedCount = _exercises.where((e) => e['isCompleted'] as bool).length;
+    final completedCount = _exercises.where((e) => e.isCompletedToday).length;
     final totalCount = _exercises.length;
 
     return Scaffold(
@@ -141,157 +113,177 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
         ),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          // Header Summary Card
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-            color: Colors.white,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: PatientTheme.primaryTeal))
+          : RefreshIndicator(
+              color: PatientTheme.primaryTeal,
+              onRefresh: _loadTodayPlan,
+              child: Column(
+                children: [
+                  // Header Summary Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                    color: Colors.white,
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Today\'s Exercises',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: PatientTheme.textDark,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Complete your exercises for today',
-                          style: TextStyle(fontSize: 12, color: PatientTheme.textSecondary),
-                        ),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: PatientTheme.primaryTealLight,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '$completedCount / $totalCount Done',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: PatientTheme.primaryTeal,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // Filter Tabs (Today, Upcoming, Completed)
-                Container(
-                  height: 38,
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: PatientTheme.inputBg,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      _buildTabItem(0, 'All (${_exercises.length})'),
-                      _buildTabItem(1, 'Upcoming (${totalCount - completedCount})'),
-                      _buildTabItem(2, 'Completed ($completedCount)'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Exercise List
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-              itemCount: _filteredExercises.length,
-              itemBuilder: (context, index) {
-                final ex = _filteredExercises[index];
-                final isDone = ex['isCompleted'] as bool;
-
-                return PatientCard(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(14),
-                  onTap: () => _openExercise(index),
-                  child: Row(
-                    children: [
-                      // Thumbnail Icon Box
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: isDone ? PatientTheme.successGreenBg : PatientTheme.primaryTealLight,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          ex['icon'] as IconData,
-                          color: isDone ? PatientTheme.successGreen : PatientTheme.primaryTeal,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-
-                      // Details
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              ex['name'] as String,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: PatientTheme.textDark,
-                              ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Text(
+                                  'Today\'s Exercises',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: PatientTheme.textDark,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Complete your exercises for today',
+                                  style: TextStyle(fontSize: 12, color: PatientTheme.textSecondary),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              '${ex['sets']} sets • ${ex['reps']} reps • ${ex['duration']}',
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                color: PatientTheme.textSecondary,
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: PatientTheme.primaryTealLight,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '$completedCount / $totalCount Done',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: PatientTheme.primaryTeal,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 14),
 
-                      // Status Badge
-                      StatusBadge(
-                        label: isDone ? 'Completed' : 'Pending',
-                        isCompleted: isDone,
-                        isPending: !isDone,
-                      ),
-                      const SizedBox(width: 6),
-                      const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: PatientTheme.textMuted),
-                    ],
+                        // Filter Tabs (All, Upcoming, Completed)
+                        Container(
+                          height: 38,
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: PatientTheme.inputBg,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              _buildTabItem(0, 'All (${_exercises.length})'),
+                              _buildTabItem(1, 'Upcoming (${totalCount - completedCount})'),
+                              _buildTabItem(2, 'Completed ($completedCount)'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                );
-              },
+
+                  // Exercise List or Empty State
+                  Expanded(
+                    child: _filteredExercises.isEmpty
+                        ? ListView(
+                            children: const [
+                              SizedBox(height: 80),
+                              Center(
+                                child: Text(
+                                  'No exercises scheduled in this section.',
+                                  style: TextStyle(color: PatientTheme.textSecondary, fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+                            itemCount: _filteredExercises.length,
+                            itemBuilder: (context, index) {
+                              final ex = _filteredExercises[index];
+                              final isDone = ex.isCompletedToday;
+
+                              return PatientCard(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(14),
+                                onTap: () => _openExercise(ex),
+                                child: Row(
+                                  children: [
+                                    // Thumbnail Icon Box
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: isDone ? PatientTheme.successGreenBg : PatientTheme.primaryTealLight,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(
+                                        Icons.fitness_center_rounded,
+                                        color: isDone ? PatientTheme.successGreen : PatientTheme.primaryTeal,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+
+                                    // Details
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            ex.exerciseTitle,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: PatientTheme.textDark,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            '${ex.sets} sets • ${ex.reps} reps • ${ex.duration}',
+                                            style: const TextStyle(
+                                              fontSize: 11.5,
+                                              color: PatientTheme.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Status Badge
+                                    StatusBadge(
+                                      label: isDone ? 'Completed' : 'Pending',
+                                      isCompleted: isDone,
+                                      isPending: !isDone,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: PatientTheme.textMuted),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-      bottomSheet: Container(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-        color: Colors.white,
-        child: PrimaryTealButton(
-          label: 'Start Next Exercise',
-          icon: Icons.play_arrow_rounded,
-          onPressed: _startNextExercise,
-        ),
-      ),
+      bottomSheet: _exercises.isEmpty
+          ? null
+          : Container(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+              color: Colors.white,
+              child: PrimaryTealButton(
+                label: 'Start Next Exercise',
+                icon: Icons.play_arrow_rounded,
+                onPressed: _startNextExercise,
+              ),
+            ),
     );
   }
 

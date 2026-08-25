@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
+import '../../models/appointment_model.dart';
+import '../../services/appointment_service.dart';
 
 const Color _cyan = Color(0xFF08A9BE);
 const Color _cyanDark = Color(0xFF078EA1);
@@ -24,25 +25,102 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
-  DateTime _selectedDate = DateTime(2026, 8, 19);
+  DateTime _selectedDate = DateTime.now();
   String _filter = 'All Appointments';
+  bool _isLoading = false;
+  List<_Appointment> _dayAppointments = [];
+  final Set<String> _datesWithAppointments = {};
 
-  final Map<String, List<_Appointment>> _appointments = {
-    '2026-08-19': [
-      _Appointment('09:00', 'AM', 'Rahul Sharma', 'RS', 'Knee Rehabilitation', '45 min', 'In-person', 'Confirmed', _green, _greenBg),
-      _Appointment('10:00', 'AM', 'Ananya Sharma', 'AS', 'Shoulder Pain', '45 min', 'Online', 'Pending', _orange, _orangeBg),
-      _Appointment('11:30', 'AM', 'Neha Gupta', 'NG', 'Back Pain', '30 min', 'In-person', 'Confirmed', _green, _greenBg),
-      _Appointment('01:00', 'PM', 'Amit Patel', 'AP', 'Sports Injury', '45 min', 'Online', 'Pending', _orange, _orangeBg),
-    ],
-    '2026-08-20': [
-      _Appointment('09:30', 'AM', 'Pooja Kulkarni', 'PK', 'Neck Pain', '30 min', 'In-person', 'Confirmed', _green, _greenBg),
-    ],
-  };
+  @override
+  void initState() {
+    super.initState();
+    _fetchAppointmentsForDate(_selectedDate);
+  }
+
+  Future<void> _fetchAppointmentsForDate(DateTime date) async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final dateStr = _dateKey(date);
+      final List<AppointmentModel> models = await AppointmentService().getAppointments(date: dateStr);
+
+      if (!mounted) return;
+
+      final converted = models.map((m) {
+        // Parse time & period
+        final rawTime = m.startTime.trim();
+        String timePart = rawTime;
+        String periodPart = 'AM';
+
+        if (rawTime.toUpperCase().contains('AM')) {
+          timePart = rawTime.replaceAll(RegExp(r'am', caseSensitive: false), '').trim();
+          periodPart = 'AM';
+        } else if (rawTime.toUpperCase().contains('PM')) {
+          timePart = rawTime.replaceAll(RegExp(r'pm', caseSensitive: false), '').trim();
+          periodPart = 'PM';
+        } else if (rawTime.contains(':')) {
+          final parts = rawTime.split(':');
+          final hr = int.tryParse(parts[0]) ?? 9;
+          final min = parts.length > 1 ? parts[1] : '00';
+          if (hr >= 12) {
+            periodPart = 'PM';
+            timePart = hr == 12 ? '12:$min' : '${hr - 12}:$min';
+          } else {
+            periodPart = 'AM';
+            timePart = hr == 0 ? '12:$min' : '$hr:$min';
+          }
+        }
+
+        String statusLabel = 'Confirmed';
+        Color statusColor = _green;
+        Color statusBg = _greenBg;
+
+        if (m.isPending) {
+          statusLabel = 'Pending';
+          statusColor = _orange;
+          statusBg = _orangeBg;
+        } else if (m.isCancelled) {
+          statusLabel = 'Cancelled';
+          statusColor = _red;
+          statusBg = _redBg;
+        } else if (m.isCompleted) {
+          statusLabel = 'Completed';
+          statusColor = _cyanDark;
+          statusBg = _cyanLight;
+        }
+
+        return _Appointment(
+          time: timePart,
+          period: periodPart,
+          patient: m.patientName ?? 'Patient',
+          initials: m.initials,
+          condition: m.patientCondition ?? 'Physical Rehabilitation',
+          duration: m.duration,
+          mode: m.appointmentType,
+          status: statusLabel,
+          statusColor: statusColor,
+          statusBg: statusBg,
+          id: m.id,
+        );
+      }).toList();
+
+      setState(() {
+        _dayAppointments = converted;
+        _isLoading = false;
+        if (converted.isNotEmpty) {
+          _datesWithAppointments.add(dateStr);
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final appointments = _appointments[_dateKey(_selectedDate)] ?? [];
-    final visible = _filteredAppointments(appointments);
+    final visible = _filteredAppointments(_dayAppointments);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -60,14 +138,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
             Expanded(
               child: RefreshIndicator(
                 color: _cyan,
-                onRefresh: () async => setState(() {}),
+                onRefresh: () => _fetchAppointmentsForDate(_selectedDate),
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   children: [
                     _buildWeekCard(),
                     const SizedBox(height: 16),
-                    _buildDaySummary(appointments),
+                    _buildDaySummary(_dayAppointments),
                     const SizedBox(height: 16),
                     _buildFilters(),
                     const SizedBox(height: 20),
@@ -76,7 +154,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       style: TextStyle(color: _cyanDark, fontSize: 15, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 12),
-                    if (visible.isEmpty)
+                    if (_isLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Center(
+                          child: CircularProgressIndicator(color: _cyan),
+                        ),
+                      )
+                    else if (visible.isEmpty)
                       _buildEmptyState()
                     else
                       ...visible.map((appointment) => Padding(
@@ -151,12 +236,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Widget _buildDateItem(DateTime date) {
     final selected = _sameDay(date, _selectedDate);
-    final hasAppointments = (_appointments[_dateKey(date)] ?? []).isNotEmpty;
+    final hasAppointments = _datesWithAppointments.contains(_dateKey(date));
     final weekday = const ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'][date.weekday - 1];
 
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => _selectedDate = date),
+        onTap: () {
+          setState(() => _selectedDate = date);
+          _fetchAppointmentsForDate(date);
+        },
         borderRadius: BorderRadius.circular(24),
         child: Column(
           children: [
@@ -349,10 +437,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                   icon: const Icon(Icons.more_vert, color: _muted, size: 21),
-                onSelected: (value) => _showAppointmentAction(value, appointment),
+                  onSelected: (value) => _showAppointmentAction(value, appointment),
                   itemBuilder: (_) => const [
                     PopupMenuItem(value: 'details', child: Text('View details')),
-                    PopupMenuItem(value: 'patient', child: Text('View patient')),
+                    PopupMenuItem(value: 'cancel', child: Text('Cancel appointment')),
                   ],
                 ),
               ),
@@ -376,9 +464,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                 ),
                 OutlinedButton.icon(
-                  onPressed: () => _showAppointmentAction('patient', appointment),
+                  onPressed: () => _showAppointmentAction('details', appointment),
                   icon: const Icon(Icons.arrow_forward, size: 15),
-                  label: const Text('View Patient'),
+                  label: const Text('View Details'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _cyanDark,
                     side: const BorderSide(color: _cyan),
@@ -408,9 +496,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Widget _buildViewMore() => Center(
         child: TextButton.icon(
-          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All appointments view is not connected yet.'))),
-          icon: const Icon(Icons.keyboard_arrow_down, color: _cyanDark),
-          label: const Text('View More Appointments', style: TextStyle(color: _cyanDark, fontWeight: FontWeight.w800, fontSize: 14)),
+          onPressed: () => _fetchAppointmentsForDate(_selectedDate),
+          icon: const Icon(Icons.refresh_rounded, color: _cyanDark),
+          label: const Text('Refresh Schedule', style: TextStyle(color: _cyanDark, fontWeight: FontWeight.w800, fontSize: 14)),
         ),
       );
 
@@ -423,7 +511,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             SizedBox(height: 12),
             Text('No appointments', style: TextStyle(color: _text, fontSize: 18, fontWeight: FontWeight.w800)),
             SizedBox(height: 6),
-            Text('There are no appointments for this day.', textAlign: TextAlign.center, style: TextStyle(color: _muted, fontSize: 13)),
+            Text('There are no appointments scheduled for this day.', textAlign: TextAlign.center, style: TextStyle(color: _muted, fontSize: 13)),
           ],
         ),
       );
@@ -441,8 +529,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
         child: SizedBox(width: 40, height: 40, child: Icon(icon, color: _cyanDark, size: 28)),
       );
 
-  void _previousWeek() => setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 7)));
-  void _nextWeek() => setState(() => _selectedDate = _selectedDate.add(const Duration(days: 7)));
+  void _previousWeek() {
+    setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 7)));
+    _fetchAppointmentsForDate(_selectedDate);
+  }
+
+  void _nextWeek() {
+    setState(() => _selectedDate = _selectedDate.add(const Duration(days: 7)));
+    _fetchAppointmentsForDate(_selectedDate);
+  }
 
   List<DateTime> _weekDates(DateTime date) {
     final monday = date.subtract(Duration(days: date.weekday - 1));
@@ -451,19 +546,57 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   List<_Appointment> _filteredAppointments(List<_Appointment> items) {
     switch (_filter) {
-      case 'Upcoming': return items.where((a) => a.status == 'Confirmed').toList();
-      case 'Completed': return items.where((a) => a.status == 'Completed').toList();
-      case 'Pending': return items.where((a) => a.status == 'Pending').toList();
-      case 'Cancelled': return items.where((a) => a.status == 'Cancelled').toList();
-      default: return items;
+      case 'Upcoming':
+        return items.where((a) => a.status == 'Confirmed').toList();
+      case 'Completed':
+        return items.where((a) => a.status == 'Completed').toList();
+      case 'Pending':
+        return items.where((a) => a.status == 'Pending').toList();
+      case 'Cancelled':
+        return items.where((a) => a.status == 'Cancelled').toList();
+      default:
+        return items;
     }
   }
 
-  void _showAppointmentAction(String action, _Appointment appointment) {
-    if (action == 'patient') {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Patient profile: ${appointment.patient}')));
+  Future<void> _showAppointmentAction(String action, _Appointment appointment) async {
+    if (action == 'cancel') {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Cancel Appointment'),
+          content: Text('Are you sure you want to cancel the appointment with ${appointment.patient}?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(backgroundColor: _red),
+              child: const Text('Cancel Appointment'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true && appointment.id != null) {
+        try {
+          await AppointmentService().cancelAppointment(appointment.id!);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Appointment cancelled successfully.')),
+            );
+            _fetchAppointmentsForDate(_selectedDate);
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to cancel appointment: $e')),
+            );
+          }
+        }
+      }
       return;
     }
+
     showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -476,10 +609,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
             children: [
               Text(appointment.patient, style: const TextStyle(color: _text, fontSize: 20, fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
-              Text(appointment.condition, style: const TextStyle(color: _muted, fontSize: 13)),
+              Text('${appointment.condition} • ${appointment.time} ${appointment.period}', style: const TextStyle(color: _muted, fontSize: 13)),
               const SizedBox(height: 16),
-              const ListTile(leading: Icon(Icons.person_outline, color: _cyanDark), title: Text('View patient')),
-              const ListTile(leading: Icon(Icons.info_outline, color: _cyanDark), title: Text('Appointment details')),
+              ListTile(
+                leading: const Icon(Icons.event, color: _cyanDark),
+                title: Text('Mode: ${appointment.mode} (${appointment.duration})'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.info_outline, color: _cyanDark),
+                title: Text('Status: ${appointment.status}'),
+              ),
             ],
           ),
         ),
@@ -496,6 +635,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
 class _Appointment {
   final String time, period, patient, initials, condition, duration, mode, status;
   final Color statusColor, statusBg;
+  final String? id;
 
-  const _Appointment(this.time, this.period, this.patient, this.initials, this.condition, this.duration, this.mode, this.status, this.statusColor, this.statusBg);
+  const _Appointment({
+    required this.time,
+    required this.period,
+    required this.patient,
+    required this.initials,
+    required this.condition,
+    required this.duration,
+    required this.mode,
+    required this.status,
+    required this.statusColor,
+    required this.statusBg,
+    this.id,
+  });
 }

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../constants/patient_theme.dart';
+import '../../models/appointment_model.dart';
+import '../../models/exercise_model.dart';
+import '../../services/appointment_service.dart';
+import '../../services/exercise_service.dart';
 import 'appointment_detail_screen.dart';
 import 'exercise_detail_screen.dart';
 import 'exercise_list_screen.dart';
@@ -21,42 +25,45 @@ class PatientDashboard extends StatefulWidget {
 
 class _PatientDashboardState extends State<PatientDashboard> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final ExerciseService _exerciseService = ExerciseService();
   String _progressFilter = 'This Month';
+  AppointmentModel? _upcomingAppointment;
+  TodayPlanModel? _todayPlan;
+  PatientProgramModel? _activeProgram;
 
-  final List<Map<String, dynamic>> _todayExercises = [
-    {
-      'name': 'Bridge Exercise',
-      'sets': '3',
-      'reps': '12',
-      'duration': '10 min',
-      'isCompleted': true,
-      'icon': Icons.accessibility_new_rounded,
-    },
-    {
-      'name': 'Wall Squat',
-      'sets': '3',
-      'reps': '15',
-      'duration': '15 min',
-      'isCompleted': true,
-      'icon': Icons.fitness_center_rounded,
-    },
-    {
-      'name': 'Leg Raise',
-      'sets': '3',
-      'reps': '12',
-      'duration': '10 min',
-      'isCompleted': false,
-      'icon': Icons.airline_seat_legroom_extra_rounded,
-    },
-    {
-      'name': 'Hamstring Stretch',
-      'sets': '3',
-      'reps': '30 sec',
-      'duration': '5 min',
-      'isCompleted': false,
-      'icon': Icons.self_improvement_rounded,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    _loadUpcomingAppointment();
+    try {
+      final plan = await _exerciseService.getTodayPlan();
+      final progs = await _exerciseService.getMyPrograms();
+      if (!mounted) return;
+      setState(() {
+        _todayPlan = plan;
+        if (progs.isNotEmpty) {
+          _activeProgram = progs.first;
+        }
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _loadUpcomingAppointment() async {
+    try {
+      final list = await AppointmentService().getAppointments();
+      if (!mounted) return;
+      final now = DateTime.now();
+      final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final upcoming = list.where((a) => !a.isCancelled && !a.isCompleted && a.appointmentDate.compareTo(todayStr) >= 0).toList();
+      if (upcoming.isNotEmpty) {
+        setState(() => _upcomingAppointment = upcoming.first);
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -164,12 +171,12 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Motivational Quote
-                  const Align(
+                  // Motivational Quote / Active Program
+                  Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Stay consistent, get stronger every day.',
-                      style: TextStyle(
+                      _activeProgram != null ? 'Active Protocol: ${_activeProgram!.title}' : 'Stay consistent, get stronger every day.',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12.5,
                         fontStyle: FontStyle.italic,
@@ -184,7 +191,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     padding: const EdgeInsets.all(16),
                     onTap: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const AppointmentDetailScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => AppointmentDetailScreen(
+                            appointment: _upcomingAppointment,
+                          ),
+                        ),
                       );
                     },
                     child: Row(
@@ -206,20 +217,24 @@ class _PatientDashboardState extends State<PatientDashboard> {
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
+                            children: [
+                              const Text(
                                 'Upcoming Appointment',
                                 style: TextStyle(fontSize: 10.5, color: PatientTheme.textSecondary, fontWeight: FontWeight.w600),
                               ),
-                              SizedBox(height: 2),
+                              const SizedBox(height: 2),
                               Text(
-                                'Today, 05:00 PM',
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: PatientTheme.textDark),
+                                _upcomingAppointment != null
+                                    ? '${_upcomingAppointment!.appointmentDate} • ${_upcomingAppointment!.startTime}'
+                                    : 'Today, 05:00 PM',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: PatientTheme.textDark),
                               ),
-                              SizedBox(height: 1),
+                              const SizedBox(height: 1),
                               Text(
-                                'Dr. Vashu User • Sports & Orthopedic',
-                                style: TextStyle(fontSize: 11, color: PatientTheme.textSecondary),
+                                _upcomingAppointment != null
+                                    ? '${_upcomingAppointment!.physioName ?? "Dr. Vashu User"} • ${_upcomingAppointment!.physioSpecialty ?? "Sports & Orthopedic"}'
+                                    : 'Dr. Vashu User • Sports & Orthopedic',
+                                style: const TextStyle(fontSize: 11, color: PatientTheme.textSecondary),
                               ),
                             ],
                           ),
@@ -251,14 +266,14 @@ class _PatientDashboardState extends State<PatientDashboard> {
                       Expanded(
                         child: _buildMetricStatCard(
                           title: 'Today\'s Exercises',
-                          value: '5/6',
+                          value: _todayPlan != null ? '${_todayPlan!.completedExercises}/${_todayPlan!.totalExercises}' : '0/0',
                           subtitle: 'Completed',
                           color: PatientTheme.primaryTeal,
                           icon: Icons.fitness_center_rounded,
                           onTap: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(builder: (_) => const ExerciseListScreen()),
-                            );
+                            ).then((_) => _loadDashboardData());
                           },
                         ),
                       ),
@@ -281,7 +296,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                       Expanded(
                         child: _buildMetricStatCard(
                           title: 'Overall Progress',
-                          value: '78%',
+                          value: _todayPlan != null ? '${_todayPlan!.progressPercentage}%' : '0%',
                           subtitle: 'Improving',
                           color: PatientTheme.successGreen,
                           icon: Icons.trending_up_rounded,
@@ -332,9 +347,9 @@ class _PatientDashboardState extends State<PatientDashboard> {
                         const SizedBox(height: 12),
 
                         // Gauge
-                        const Center(
+                        Center(
                           child: CircularProgressGauge(
-                            progress: 0.78,
+                            progress: ((_todayPlan?.progressPercentage ?? 0) / 100.0).clamp(0.0, 1.0),
                             subtitle: 'Good Progress',
                           ),
                         ),
@@ -343,10 +358,14 @@ class _PatientDashboardState extends State<PatientDashboard> {
                         // Breakdown
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: const [
-                            _BreakdownPill(label: 'Completed', value: '78%', color: PatientTheme.successGreen),
-                            _BreakdownPill(label: 'In Progress', value: '15%', color: PatientTheme.infoBlue),
-                            _BreakdownPill(label: 'Pending', value: '7%', color: PatientTheme.warningOrange),
+                          children: [
+                            _BreakdownPill(
+                              label: 'Completed',
+                              value: '${_todayPlan?.progressPercentage ?? 0}%',
+                              color: PatientTheme.successGreen,
+                            ),
+                            const _BreakdownPill(label: 'In Progress', value: '15%', color: PatientTheme.infoBlue),
+                            const _BreakdownPill(label: 'Pending', value: '7%', color: PatientTheme.warningOrange),
                           ],
                         ),
                       ],
@@ -391,7 +410,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(builder: (_) => const ExerciseListScreen()),
-                          );
+                          ).then((_) => _loadDashboardData());
                         },
                         child: const Text(
                           'See All Exercises >',
@@ -406,79 +425,92 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Exercise Rows
-                  ...List.generate(_todayExercises.length, (index) {
-                    final ex = _todayExercises[index];
-                    final isDone = ex['isCompleted'] as bool;
-
-                    return PatientCard(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(12),
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => ExerciseDetailScreen(
-                              exerciseName: ex['name'] as String,
-                              sets: ex['sets'] as String,
-                              reps: ex['reps'] as String,
-                              duration: ex['duration'] as String,
-                              isInitiallyCompleted: isDone,
-                            ),
-                          ),
-                        );
-                      },
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: isDone ? PatientTheme.successGreenBg : PatientTheme.primaryTealLight,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              ex['icon'] as IconData,
-                              color: isDone ? PatientTheme.successGreen : PatientTheme.primaryTeal,
-                              size: 22,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  ex['name'] as String,
-                                  style: const TextStyle(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: PatientTheme.textDark,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${ex['sets']} sets • ${ex['reps']} reps • ${ex['duration']}',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: PatientTheme.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          StatusBadge(
-                            label: isDone ? 'Completed' : 'Pending',
-                            isCompleted: isDone,
-                            isPending: !isDone,
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: PatientTheme.textMuted),
-                        ],
+                  // Exercise Rows or Empty State
+                  if (_todayPlan == null || _todayPlan!.exercises.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: Text(
+                          'No exercises assigned for today.',
+                          style: TextStyle(color: PatientTheme.textSecondary, fontSize: 13),
+                        ),
                       ),
-                    );
-                  }),
+                    )
+                  else
+                    ..._todayPlan!.exercises.take(4).map((ex) {
+                      final isDone = ex.isCompletedToday;
+
+                      return PatientCard(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(12),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ExerciseDetailScreen(
+                                assignmentId: ex.id,
+                                exerciseName: ex.exerciseTitle,
+                                targetArea: ex.bodyPart,
+                                sets: '${ex.sets}',
+                                reps: '${ex.reps}',
+                                duration: ex.duration,
+                                isInitiallyCompleted: isDone,
+                                instructions: ex.instructions,
+                              ),
+                            ),
+                          ).then((_) => _loadDashboardData());
+                        },
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: isDone ? PatientTheme.successGreenBg : PatientTheme.primaryTealLight,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.fitness_center_rounded,
+                                color: isDone ? PatientTheme.successGreen : PatientTheme.primaryTeal,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    ex.exerciseTitle,
+                                    style: const TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: PatientTheme.textDark,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${ex.sets} sets • ${ex.reps} reps • ${ex.duration}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: PatientTheme.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            StatusBadge(
+                              label: isDone ? 'Completed' : 'Pending',
+                              isCompleted: isDone,
+                              isPending: !isDone,
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: PatientTheme.textMuted),
+                          ],
+                        ),
+                      );
+                    }),
                   const SizedBox(height: 16),
                 ],
               ),

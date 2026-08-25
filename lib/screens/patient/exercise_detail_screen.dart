@@ -1,31 +1,37 @@
 import 'package:flutter/material.dart';
 import '../../constants/patient_theme.dart';
+import '../../services/exercise_service.dart';
 import 'patient_components.dart';
 
-/// Screen 9 — Exercise Details Screen (matching media_1787385006975.jpg)
+/// Screen 9 — Exercise Details Screen (matching design)
 class ExerciseDetailScreen extends StatefulWidget {
   const ExerciseDetailScreen({
     super.key,
+    this.assignmentId,
     this.exerciseName = 'Bridge Exercise',
     this.targetArea = 'Glutes • Lower Body',
     this.sets = '3',
     this.reps = '12',
     this.duration = '10:00',
     this.isInitiallyCompleted = false,
+    this.instructions,
   });
 
+  final String? assignmentId;
   final String exerciseName;
   final String targetArea;
   final String sets;
   final String reps;
   final String duration;
   final bool isInitiallyCompleted;
+  final String? instructions;
 
   @override
   State<ExerciseDetailScreen> createState() => _ExerciseDetailScreenState();
 }
 
 class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
+  final ExerciseService _exerciseService = ExerciseService();
   late bool _isCompleted;
   bool _isPlayingVideo = false;
 
@@ -35,8 +41,21 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
     _isCompleted = widget.isInitiallyCompleted;
   }
 
-  void _toggleCompleted() {
-    setState(() => _isCompleted = !_isCompleted);
+  Future<void> _toggleCompleted() async {
+    final nextState = !_isCompleted;
+    setState(() => _isCompleted = nextState);
+
+    if (nextState && widget.assignmentId != null && widget.assignmentId!.isNotEmpty) {
+      try {
+        await _exerciseService.completeExercise(
+          assignmentId: widget.assignmentId!,
+          completedSets: int.tryParse(widget.sets) ?? 3,
+          completedReps: int.tryParse(widget.reps) ?? 12,
+        );
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(_isCompleted ? 'Exercise marked as completed! 🎉' : 'Exercise marked as pending'),
@@ -48,6 +67,14 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final defaultInstructions = [
+      'Lie down on the mat with knees bent and feet flat on the floor.',
+      'Keep your arms straight at your sides with palms down.',
+      'Lift hips upward until knees, hips, and shoulders form a straight line.',
+      'Squeeze glutes tight at the top for 3 to 5 seconds.',
+      'Slowly lower back down to starting position with control.',
+    ];
+
     return Scaffold(
       backgroundColor: PatientTheme.pageBg,
       appBar: AppBar(
@@ -62,12 +89,6 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: PatientTheme.textDark),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bookmark_border_rounded, color: PatientTheme.textDark),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -173,10 +194,11 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Description
-            const Text(
-              'Lie on your back with knees bent. Lift your hips up while squeezing your glutes. Hold and slowly lower down.',
-              style: TextStyle(fontSize: 13, color: PatientTheme.textSecondary, height: 1.45),
+            // Description / Instructions
+            Text(
+              widget.instructions ??
+                  'Lie on your back with knees bent. Lift your hips up while squeezing your glutes. Hold and slowly lower down.',
+              style: const TextStyle(fontSize: 13, color: PatientTheme.textSecondary, height: 1.45),
             ),
             const SizedBox(height: 20),
 
@@ -207,11 +229,8 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  _buildStepRow(1, 'Lie down on the mat with knees bent and feet flat on the floor.'),
-                  _buildStepRow(2, 'Keep your arms straight at your sides with palms down.'),
-                  _buildStepRow(3, 'Lift hips upward until knees, hips, and shoulders form a straight line.'),
-                  _buildStepRow(4, 'Squeeze glutes tight at the top for 3 to 5 seconds.'),
-                  _buildStepRow(5, 'Slowly lower back down to starting position with control.'),
+                  for (int i = 0; i < defaultInstructions.length; i++)
+                    _buildStepRow(i + 1, defaultInstructions[i]),
                 ],
               ),
             ),
@@ -232,7 +251,7 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Stop immediately if you experience sharp lower back pain. Maintain smooth, controlled breathing.',
+                      'Stop immediately if you experience sharp pain. Maintain smooth, controlled breathing throughout the repetition.',
                       style: TextStyle(fontSize: 11.5, color: Color(0xFF92400E), height: 1.35),
                     ),
                   ),

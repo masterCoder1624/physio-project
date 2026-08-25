@@ -3,6 +3,7 @@ import '../../models/clinical_models.dart';
 import '../../models/patient_model.dart';
 import '../../services/patient_service.dart';
 import '../../services/pdf_invoice_service.dart';
+import 'exercise_library_screen.dart';
 
 const Color _primary = Color(0xFF079E9B);
 const Color _primaryDark = Color(0xFF087F7C);
@@ -731,6 +732,23 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
             icon: Icons.chat_bubble_outline_rounded,
             label: 'Message',
             onTap: () => _showContactMessage('Message'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _QuickAction(
+            icon: Icons.fitness_center_rounded,
+            label: 'Prescribe',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ExerciseLibraryScreen(
+                    patientId: _patient?.id,
+                    patientName: _patient?.name,
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ],

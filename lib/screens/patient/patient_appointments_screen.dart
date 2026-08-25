@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../constants/patient_theme.dart';
+import '../../models/appointment_model.dart';
+import '../../services/appointment_service.dart';
 import 'appointment_detail_screen.dart';
 import 'patient_book_appointment_screen.dart';
 import 'patient_components.dart';
 
-/// Screen 15 — Appointments Screen (matching media_1787385006975.jpg)
+/// Screen 15 — Appointments Screen (connected with backend)
 class PatientAppointmentsScreen extends StatefulWidget {
   const PatientAppointmentsScreen({super.key});
 
@@ -14,17 +16,55 @@ class PatientAppointmentsScreen extends StatefulWidget {
 
 class _PatientAppointmentsScreenState extends State<PatientAppointmentsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _isLoading = false;
+  List<AppointmentModel> _allAppointments = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _fetchAppointments();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchAppointments() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final list = await AppointmentService().getAppointments();
+      if (!mounted) return;
+      setState(() {
+        _allAppointments = list;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
+  }
+
+  List<AppointmentModel> get _upcomingAppointments {
+    final now = DateTime.now();
+    final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    return _allAppointments.where((a) {
+      if (a.isCancelled || a.isCompleted) return false;
+      return a.appointmentDate.compareTo(todayStr) >= 0;
+    }).toList();
+  }
+
+  List<AppointmentModel> get _pastAppointments {
+    final now = DateTime.now();
+    final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    return _allAppointments.where((a) {
+      if (a.isCancelled || a.isCompleted) return true;
+      return a.appointmentDate.compareTo(todayStr) < 0;
+    }).toList();
   }
 
   @override
@@ -57,66 +97,107 @@ class _PatientAppointmentsScreenState extends State<PatientAppointmentsScreen> w
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildUpcomingTab(),
-          _buildPastTab(),
-        ],
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: PatientTheme.primaryTeal))
+          : RefreshIndicator(
+              color: PatientTheme.primaryTeal,
+              onRefresh: _fetchAppointments,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildUpcomingTab(_upcomingAppointments),
+                  _buildPastTab(_pastAppointments),
+                ],
+              ),
+            ),
       bottomSheet: Container(
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
         color: Colors.white,
         child: PrimaryTealButton(
           label: 'Book New Appointment',
           icon: Icons.add_rounded,
-          onPressed: () {
-            Navigator.of(context).push(
+          onPressed: () async {
+            final booked = await Navigator.of(context).push<bool>(
               MaterialPageRoute(builder: (_) => const PatientBookAppointmentScreen()),
             );
+            if (booked == true) {
+              _fetchAppointments();
+            }
           },
         ),
       ),
     );
   }
 
-  Widget _buildUpcomingTab() {
-    return ListView(
+  Widget _buildUpcomingTab(List<AppointmentModel> appointments) {
+    if (appointments.isEmpty) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(20, 40, 20, 90),
+        children: const [
+          Center(
+            child: Column(
+              children: [
+                Icon(Icons.event_available_outlined, size: 50, color: PatientTheme.textMuted),
+                SizedBox(height: 12),
+                Text(
+                  'No upcoming appointments',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: PatientTheme.textDark),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Tap "Book New Appointment" below to schedule a session.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: PatientTheme.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 90),
-      children: [
-        // Today's Appointment (matching screenshot)
-        PatientCard(
+      itemCount: appointments.length,
+      itemBuilder: (context, index) {
+        final item = appointments[index];
+        final dayStr = _extractDay(item.appointmentDate);
+        final monthStr = _extractMonth(item.appointmentDate);
+        final isPrimaryCard = index == 0;
+
+        return PatientCard(
+          margin: const EdgeInsets.only(bottom: 14),
           padding: const EdgeInsets.all(16),
-          onTap: () => _openDetail('Today, 05:00 PM', '19 Aug 2026'),
+          onTap: () => _openDetail(item),
           child: Column(
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Date Stamp Box (19 AUG)
+                  // Date Stamp Box
                   Container(
                     width: 54,
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
-                      color: PatientTheme.primaryTealLight,
+                      color: isPrimaryCard ? PatientTheme.primaryTealLight : PatientTheme.borderLight,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
-                      children: const [
+                      children: [
                         Text(
-                          '19',
+                          dayStr,
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
-                            color: PatientTheme.primaryTeal,
+                            color: isPrimaryCard ? PatientTheme.primaryTeal : PatientTheme.textDark,
                           ),
                         ),
                         Text(
-                          'AUG',
+                          monthStr,
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: PatientTheme.primaryTeal,
+                            color: isPrimaryCard ? PatientTheme.primaryTeal : PatientTheme.textSecondary,
                           ),
                         ),
                       ],
@@ -128,29 +209,29 @@ class _PatientAppointmentsScreenState extends State<PatientAppointmentsScreen> w
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         Text(
-                          'Today, 05:00 PM',
-                          style: TextStyle(
+                          '${item.appointmentDate} • ${item.startTime}',
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: PatientTheme.textDark,
                           ),
                         ),
-                        SizedBox(height: 3),
+                        const SizedBox(height: 3),
                         Text(
-                          'Dr. Vashu User',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: PatientTheme.textDark),
+                          item.physioName ?? 'Dr. Vashu User',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: PatientTheme.textDark),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
-                          'Sports & Orthopedic Physiotherapy',
-                          style: TextStyle(fontSize: 11, color: PatientTheme.textSecondary),
+                          item.physioSpecialty ?? 'Sports & Orthopedic Physiotherapy',
+                          style: const TextStyle(fontSize: 11, color: PatientTheme.textSecondary),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
-                          '⏱ 30 min',
-                          style: TextStyle(fontSize: 11, color: PatientTheme.textMuted),
+                          '⏱ ${item.duration} • ${item.appointmentType}',
+                          style: const TextStyle(fontSize: 11, color: PatientTheme.textMuted),
                         ),
                       ],
                     ),
@@ -167,10 +248,11 @@ class _PatientAppointmentsScreenState extends State<PatientAppointmentsScreen> w
                     child: SecondaryOutlineButton(
                       label: 'Reschedule',
                       height: 36,
-                      onPressed: () {
-                        Navigator.of(context).push(
+                      onPressed: () async {
+                        final booked = await Navigator.of(context).push<bool>(
                           MaterialPageRoute(builder: (_) => const PatientBookAppointmentScreen()),
                         );
+                        if (booked == true) _fetchAppointments();
                       },
                     ),
                   ),
@@ -179,7 +261,7 @@ class _PatientAppointmentsScreenState extends State<PatientAppointmentsScreen> w
                     child: SizedBox(
                       height: 36,
                       child: ElevatedButton(
-                        onPressed: () => _openDetail('Today, 05:00 PM', '19 Aug 2026'),
+                        onPressed: () => _openDetail(item),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: PatientTheme.primaryTeal,
                           foregroundColor: Colors.white,
@@ -194,85 +276,36 @@ class _PatientAppointmentsScreenState extends State<PatientAppointmentsScreen> w
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 14),
-
-        // Upcoming Appointment 2 (26 AUG)
-        PatientCard(
-          padding: const EdgeInsets.all(16),
-          onTap: () => _openDetail('Friday, 04:00 PM', '26 Aug 2026'),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 54,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: PatientTheme.borderLight,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: const [
-                    Text(
-                      '26',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: PatientTheme.textDark,
-                      ),
-                    ),
-                    Text(
-                      'AUG',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: PatientTheme.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Friday, 04:00 PM',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: PatientTheme.textDark,
-                      ),
-                    ),
-                    SizedBox(height: 3),
-                    Text(
-                      'Dr. Vashu User',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: PatientTheme.textDark),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Sports & Orthopedic Physiotherapy',
-                      style: TextStyle(fontSize: 11, color: PatientTheme.textSecondary),
-                    ),
-                    SizedBox(height: 6),
-                    StatusBadge(label: 'Scheduled', isScheduled: true),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  Widget _buildPastTab() {
-    return ListView(
+  Widget _buildPastTab(List<AppointmentModel> appointments) {
+    if (appointments.isEmpty) {
+      return ListView(
+        padding: const EdgeInsets.all(40),
+        children: const [
+          Center(
+            child: Text(
+              'No past appointments found.',
+              style: TextStyle(fontSize: 13, color: PatientTheme.textSecondary),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView.builder(
       padding: const EdgeInsets.all(20),
-      children: [
-        PatientCard(
+      itemCount: appointments.length,
+      itemBuilder: (context, index) {
+        final item = appointments[index];
+        final dayStr = _extractDay(item.appointmentDate);
+        final monthStr = _extractMonth(item.appointmentDate);
+
+        return PatientCard(
+          margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
@@ -284,9 +317,9 @@ class _PatientAppointmentsScreenState extends State<PatientAppointmentsScreen> w
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Column(
-                  children: const [
-                    Text('08', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    Text('AUG', style: TextStyle(fontSize: 9.5, color: PatientTheme.textSecondary)),
+                  children: [
+                    Text(dayStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(monthStr, style: const TextStyle(fontSize: 9.5, color: PatientTheme.textSecondary)),
                   ],
                 ),
               ),
@@ -294,29 +327,54 @@ class _PatientAppointmentsScreenState extends State<PatientAppointmentsScreen> w
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text('Initial Knee Assessment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                    SizedBox(height: 2),
-                    Text('Dr. Vashu User • Completed', style: TextStyle(fontSize: 11.5, color: PatientTheme.textSecondary)),
+                  children: [
+                    Text(item.patientCondition ?? 'Session Consultation', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                    const SizedBox(height: 2),
+                    Text('${item.physioName ?? "Dr. Vashu User"} • ${item.status.toUpperCase()}', style: const TextStyle(fontSize: 11.5, color: PatientTheme.textSecondary)),
                   ],
                 ),
               ),
-              const StatusBadge(label: 'Completed', isCompleted: true),
+              StatusBadge(
+                label: item.status.toUpperCase(),
+                isCompleted: item.isCompleted,
+                isPending: item.isPending,
+              ),
             ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  void _openDetail(String time, String date) {
+  void _openDetail(AppointmentModel appointment) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => AppointmentDetailScreen(
-          time: time,
-          date: date,
+          appointment: appointment,
+          time: appointment.startTime,
+          date: appointment.appointmentDate,
         ),
       ),
     );
+  }
+
+  String _extractDay(String dateStr) {
+    if (dateStr.contains('-')) {
+      final parts = dateStr.split('-');
+      if (parts.length >= 3) return parts[2];
+    }
+    return '01';
+  }
+
+  String _extractMonth(String dateStr) {
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    if (dateStr.contains('-')) {
+      final parts = dateStr.split('-');
+      if (parts.length >= 2) {
+        final m = int.tryParse(parts[1]) ?? 1;
+        if (m >= 1 && m <= 12) return months[m - 1];
+      }
+    }
+    return 'AUG';
   }
 }
