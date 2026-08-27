@@ -412,7 +412,7 @@ class _SignupScreenState extends State<SignupScreen> {
         const SizedBox(height: 8),
 
         const Text(
-          'Join PhysioSoft and manage your practice, '
+          'Join RehabZ and manage your practice, '
           'patients and appointments smarter.',
           style: TextStyle(
             color: _textMuted,

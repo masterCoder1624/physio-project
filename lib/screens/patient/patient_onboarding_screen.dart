@@ -65,7 +65,7 @@ class _PatientOnboardingScreenState extends State<PatientOnboardingScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Small PhysioVerse logo text
+                  // Small RehabZ logo text
                   Row(
                     children: [
                       Container(
@@ -82,7 +82,7 @@ class _PatientOnboardingScreenState extends State<PatientOnboardingScreen> {
                       ),
                       const SizedBox(width: 8),
                       const Text(
-                        'PhysioVerse',
+                        'RehabZ',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,

@@ -27,12 +27,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _navIndex = 4;
 
   String _doctorName = 'Dr. Arjun Kapoor';
-  String _email = 'dr.arjun@physioverse.com';
+  String _email = 'dr.arjun@rehabz.com';
   String _phone = '+91 99887 76655';
   String _initials = 'DA';
 
   final String _specialty = 'Sports & Orthopedic Physiotherapy';
-  final String _clinicName = 'PhysioVerse Clinic';
+  final String _clinicName = 'RehabZ Clinic';
   final String _location = 'Bandra West, Mumbai';
   final String _experience = '8 years';
   final String _consultationFee = '₹500 (online) · ₹800 (in-person)';

@@ -286,26 +286,28 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         const SizedBox(height: 22),
 
-        // IMPORTANT:
-        // This is the LOGIN image, not the splash image.
+        // RehabZ Official Logo Header
         ClipRRect(
           borderRadius: BorderRadius.circular(28),
           child: Container(
-            height: 300,
+            height: 180,
             width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             color: const Color(0xFFEAF8F8),
-            child: Image.asset(
-              'assets/images/physiosoft_login_illustration.png',
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) {
-                return const Center(
-                  child: Icon(
-                    Icons.medical_services_outlined,
-                    color: _primary,
-                    size: 72,
-                  ),
-                );
-              },
+            child: Center(
+              child: Image.asset(
+                'assets/images/rehabz_logo.png',
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(
+                    child: Icon(
+                      Icons.medical_services_outlined,
+                      color: _primary,
+                      size: 72,
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -326,7 +328,7 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0B5960).withOpacity(.09),
+            color: const Color(0xFF0B5960).withValues(alpha: .09),
             blurRadius: 30,
             offset: const Offset(0, 15),
           ),
@@ -338,7 +340,7 @@ class _LoginScreenState extends State<LoginScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Sign in to PhysioSoft',
+              'Sign in to RehabZ',
               style: TextStyle(
                 color: _darkText,
                 fontSize: 22,
@@ -574,7 +576,7 @@ class _LoginScreenState extends State<LoginScreen>
             const SizedBox(height: 21),
 
             const Text(
-              'New to PhysioSoft?',
+              'New to RehabZ?',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: _mutedText,

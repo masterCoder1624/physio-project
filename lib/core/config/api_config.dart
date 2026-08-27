@@ -1,4 +1,4 @@
-/// Single Centralized API Configuration for PhysioVerse Flutter App
+/// Single Centralized API Configuration for RehabZ Flutter App
 class ApiConfig {
   /// Production Backend deployed on Render
   static const String baseUrl = "https://physio-backend-cc4d.onrender.com/api/v1";

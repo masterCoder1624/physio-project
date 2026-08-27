@@ -1,11 +1,11 @@
 {
-    "name": "flutter_application_1",
-    "short_name": "flutter_application_1",
+    "name": "RehabZ",
+    "short_name": "RehabZ",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#00AFC1",
+    "theme_color": "#00AFC1",
+    "description": "RehabZ - Physiotherapy & Rehabilitation Platform",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -24,7 +24,7 @@ class PatientSideDrawer extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Log Out'),
-        content: const Text('Are you sure you want to log out of PhysioVerse?'),
+        content: const Text('Are you sure you want to log out of RehabZ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),

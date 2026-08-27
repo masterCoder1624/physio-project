@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Centralized Teal & White Theme System for PhysioVerse Patient Application
+/// Centralized Teal & White Theme System for RehabZ Patient Application
 class PatientTheme {
   // Primary Teal Palette (matching reference screenshot media_1787385006975.jpg)
   static const Color primaryTeal = Color(0xFF00A98C);

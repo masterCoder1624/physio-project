@@ -242,7 +242,7 @@ class _SplashScreenState extends State<SplashScreen>
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(34),
                               child: Image.asset(
-                                'assets/images/physiosoft_splash_screen.png',
+                                'assets/images/rehabz_splash_logo.png',
                                 width: double.infinity,
                                 height: double.infinity,
                                 fit: BoxFit.contain,

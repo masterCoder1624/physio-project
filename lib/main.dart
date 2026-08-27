@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
 
-      title: 'PhysioSoft',
+      title: 'RehabZ',
 
       theme: ThemeData(
         brightness: Brightness.light,
@@ -57,7 +57,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
 
-      // Start directly with PhysioSoft splash.
+      // Start directly with RehabZ splash.
       home: const SplashScreen(),
     );
   }

@@ -160,7 +160,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
                   const Divider(height: 20, color: PatientTheme.border),
                   _buildDetailRow(Icons.timer_outlined, 'Duration', _duration),
                   const Divider(height: 20, color: PatientTheme.border),
-                  _buildDetailRow(Icons.location_on_outlined, 'Clinic', 'PhysioVerse Clinic, Bandra West, Mumbai'),
+                  _buildDetailRow(Icons.location_on_outlined, 'Clinic', 'RehabZ Clinic, Bandra West, Mumbai'),
                 ],
               ),
             ),

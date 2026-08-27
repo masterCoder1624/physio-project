@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Centralized Dark Forest Green Theme Colors for PhysioVerse
+/// Centralized Dark Forest Green Theme Colors for RehabZ
 class AppColors {
   // Primary Forest Green Palette (matching reference image)
   static const Color primary = Color(0xFF1E3A2B);       // Main Forest Green

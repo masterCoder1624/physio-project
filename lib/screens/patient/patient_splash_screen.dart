@@ -38,9 +38,9 @@ class PatientSplashScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // PhysioVerse Title
+              // RehabZ Title
               const Text(
-                'PhysioVerse',
+                'RehabZ',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w900,

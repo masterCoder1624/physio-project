@@ -133,7 +133,7 @@ class _WelcomeMessage extends StatelessWidget {
         _HeartMark(),
         SizedBox(height: 25),
         Text(
-          'Welcome to\nPhysioVerse',
+          'Welcome to\nRehabZ',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Colors.white,

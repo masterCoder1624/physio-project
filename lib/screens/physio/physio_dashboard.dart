@@ -11,7 +11,7 @@ import 'physio_navigation.dart';
 import 'physio_main_shell.dart';
 import '../auth/login_screen.dart';
 
-// PhysioSoft frontend theme — unchanged.
+// RehabZ frontend theme — unchanged.
 const Color kPrimaryCyan = Color(0xFF00AFC1);
 const Color kDarkCyan = Color(0xFF008C9E);
 const Color kLightCyan = Color(0xFFE8F9FB);
@@ -162,7 +162,7 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
               _headerIconButton(Icons.menu_rounded, () {}),
               const SizedBox(width: 12),
               const Expanded(
-                child: Text('PhysioSoft', style: TextStyle(
+                child: Text('RehabZ', style: TextStyle(
                   color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800,
                 )),
               ),

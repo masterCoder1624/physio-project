@@ -7,7 +7,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues({});
 
-  group('PhysioVerse V1 Clinical Workflow & Release Gate Tests', () {
+  group('RehabZ V1 Clinical Workflow & Release Gate Tests', () {
     final patientService = PatientService();
 
     test('Full V1 Release Gate: Register -> Assess -> Plan -> Note -> Prescribe -> HEP Complete -> Bill in Vault', () async {
