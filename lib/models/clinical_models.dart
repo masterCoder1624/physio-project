@@ -35,7 +35,7 @@ class AssessmentModel {
   factory AssessmentModel.fromJson(Map<String, dynamic> json) {
     return AssessmentModel(
       id: json['id'] as String? ?? 'ASS_${DateTime.now().millisecondsSinceEpoch}',
-      date: json['date'] as String? ?? DateTime.now().toIso8601String().substring(0, 10),
+      date: json['assessment_date'] as String? ?? json['date'] as String? ?? DateTime.now().toIso8601String().substring(0, 10),
       chiefComplaint: json['chief_complaint'] as String? ?? 'Pain and limited mobility',
       painLevel: json['pain_level'] as int? ?? 5,
       painType: json['pain_type'] as String? ?? 'Aching',
@@ -332,12 +332,12 @@ class SessionNoteModel {
     return SessionNoteModel(
       id: json['id'] as String? ?? 'NOTE_${DateTime.now().millisecondsSinceEpoch}',
       sessionNumber: json['session_number'] as int? ?? 1,
-      date: json['date'] as String? ?? DateTime.now().toIso8601String().substring(0, 10),
+      date: json['session_date'] as String? ?? json['date'] as String? ?? DateTime.now().toIso8601String().substring(0, 10),
       painLevel: json['pain_level'] as int? ?? 3,
-      subjectiveNotes: json['subjective_notes'] as String? ?? '',
-      objectiveFindings: json['objective_findings'] as String? ?? '',
-      treatmentRendered: json['treatment_rendered'] as String? ?? '',
-      planForNextSession: json['plan_for_next_session'] as String? ?? '',
+      subjectiveNotes: json['subjective'] as String? ?? json['subjective_notes'] as String? ?? '',
+      objectiveFindings: json['objective'] as String? ?? json['objective_findings'] as String? ?? '',
+      treatmentRendered: json['assessment'] as String? ?? json['treatment_rendered'] as String? ?? '',
+      planForNextSession: json['plan'] as String? ?? json['plan_for_next_session'] as String? ?? '',
       therapistName: json['therapist_name'] as String? ?? 'Dr. Alex',
     );
   }
@@ -346,11 +346,16 @@ class SessionNoteModel {
     return {
       'id': id,
       'session_number': sessionNumber,
+      'session_date': date,
       'date': date,
       'pain_level': painLevel,
+      'subjective': subjectiveNotes,
       'subjective_notes': subjectiveNotes,
+      'objective': objectiveFindings,
       'objective_findings': objectiveFindings,
+      'assessment': treatmentRendered,
       'treatment_rendered': treatmentRendered,
+      'plan': planForNextSession,
       'plan_for_next_session': planForNextSession,
       'therapist_name': therapistName,
     };

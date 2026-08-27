@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../models/clinical_models.dart';
 import '../../models/patient_model.dart';
+import '../../services/clinical_service.dart';
 import '../../services/patient_service.dart';
 import '../../services/pdf_invoice_service.dart';
 import 'exercise_library_screen.dart';
+import 'physio_chat_screen.dart';
 
 const Color _primary = Color(0xFF079E9B);
 const Color _primaryDark = Color(0xFF087F7C);
@@ -68,9 +70,14 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
       if (widget.patient != null) {
         loaded = widget.patient!;
 
-        if ((loaded.id ?? '').isNotEmpty) {
-          loaded = await PatientService().getPatientById(loaded.id!);
-        }
+        try {
+          if ((loaded.id ?? '').isNotEmpty) {
+            final fetched = await PatientService().getPatientById(loaded.id!);
+            if (fetched.id == loaded.id) {
+              loaded = fetched;
+            }
+          }
+        } catch (_) {}
       } else {
         final id = widget.patientId ?? '1';
         loaded = await PatientService().getPatientById(id);
@@ -152,6 +159,292 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
     }
 
     _showMessage('$type: $phone');
+  }
+
+  Future<void> _openRecordAssessmentModal() async {
+    final patient = _patient;
+    if (patient == null) return;
+
+    final currentAssessment = patient.assessment;
+    int pain = currentAssessment?.painLevel ?? 4;
+    String painType = currentAssessment?.painType ?? 'Aching';
+    final complaintCtrl = TextEditingController(
+      text: currentAssessment?.chiefComplaint ?? patient.condition,
+    );
+    final flexionCtrl = TextEditingController(
+      text: currentAssessment?.activeRomFlexion ?? '110°',
+    );
+    final extensionCtrl = TextEditingController(
+      text: currentAssessment?.activeRomExtension ?? '0°',
+    );
+    final passiveRomCtrl = TextEditingController(
+      text: currentAssessment?.passiveRom ?? '115°',
+    );
+    final mmtCtrl = TextEditingController(
+      text: currentAssessment?.muscleStrengthMMT ?? '4/5',
+    );
+    final limitationsCtrl = TextEditingController(
+      text: currentAssessment?.functionalLimitations ?? 'Difficulty with full range movements',
+    );
+    final goalCtrl = TextEditingController(
+      text: currentAssessment?.clinicalGoal ?? 'Restore full pain-free mobility',
+    );
+
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (context, setModalState) {
+              return Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    20,
+                    20,
+                    MediaQuery.of(context).viewInsets.bottom + 20,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: _softTeal,
+                                borderRadius: BorderRadius.circular(13),
+                              ),
+                              child: const Icon(
+                                Icons.analytics_outlined,
+                                color: _primaryDark,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Clinical Assessment',
+                                    style: TextStyle(
+                                      color: _textDark,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Record Physical Evaluation Metrics',
+                                    style: TextStyle(
+                                      color: _textMuted,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              icon: const Icon(Icons.close_rounded, color: _textMuted),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Pain Level',
+                              style: TextStyle(color: _textDark, fontSize: 13, fontWeight: FontWeight.w700),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: _softTeal,
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: Text(
+                                '$pain / 10',
+                                style: const TextStyle(color: _primaryDark, fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Slider(
+                          value: pain.toDouble(),
+                          min: 0,
+                          max: 10,
+                          divisions: 10,
+                          activeColor: _primary,
+                          inactiveColor: _border,
+                          onChanged: (val) => setModalState(() => pain = val.round()),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Flexion ROM', style: TextStyle(color: _textDark, fontSize: 12, fontWeight: FontWeight.w700)),
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    controller: flexionCtrl,
+                                    decoration: InputDecoration(
+                                      hintText: 'e.g. 115°',
+                                      filled: true,
+                                      fillColor: _background,
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Extension ROM', style: TextStyle(color: _textDark, fontSize: 12, fontWeight: FontWeight.w700)),
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    controller: extensionCtrl,
+                                    decoration: InputDecoration(
+                                      hintText: 'e.g. 0°',
+                                      filled: true,
+                                      fillColor: _background,
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('MMT Strength', style: TextStyle(color: _textDark, fontSize: 12, fontWeight: FontWeight.w700)),
+                                  const SizedBox(height: 6),
+                                  TextField(
+                                    controller: mmtCtrl,
+                                    decoration: InputDecoration(
+                                      hintText: 'e.g. 4/5',
+                                      filled: true,
+                                      fillColor: _background,
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Chief Complaint', style: TextStyle(color: _textDark, fontSize: 12, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: complaintCtrl,
+                          decoration: InputDecoration(
+                            hintText: 'e.g. Anterior knee pain with weight bearing',
+                            filled: true,
+                            fillColor: _background,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Clinical Goal', style: TextStyle(color: _textDark, fontSize: 12, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: goalCtrl,
+                          decoration: InputDecoration(
+                            hintText: 'e.g. Achieve 130° flexion and pain-free stairs descent',
+                            filled: true,
+                            fillColor: _background,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _border)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              final navigator = Navigator.of(context);
+                              final messenger = ScaffoldMessenger.of(context);
+
+                              final newAssessment = AssessmentModel(
+                                id: currentAssessment?.id ?? 'ASS_${DateTime.now().millisecondsSinceEpoch}',
+                                date: DateTime.now().toIso8601String().substring(0, 10),
+                                chiefComplaint: complaintCtrl.text.trim().isNotEmpty ? complaintCtrl.text.trim() : patient.condition,
+                                painLevel: pain,
+                                painType: painType,
+                                activeRomFlexion: flexionCtrl.text.trim().isNotEmpty ? flexionCtrl.text.trim() : '110°',
+                                activeRomExtension: extensionCtrl.text.trim().isNotEmpty ? extensionCtrl.text.trim() : '0°',
+                                passiveRom: passiveRomCtrl.text.trim().isNotEmpty ? passiveRomCtrl.text.trim() : '115°',
+                                muscleStrengthMMT: mmtCtrl.text.trim().isNotEmpty ? mmtCtrl.text.trim() : '4/5',
+                                functionalLimitations: limitationsCtrl.text.trim(),
+                                clinicalGoal: goalCtrl.text.trim(),
+                              );
+
+                              try {
+                                await ClinicalService().createAssessment(patient.id ?? '1', newAssessment);
+                                await _refreshPatient();
+                                if (!mounted) return;
+                                navigator.pop();
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Clinical assessment saved successfully.'),
+                                    backgroundColor: _success,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              } catch (_) {
+                                if (!mounted) return;
+                                _showMessage('Unable to save clinical assessment.', isError: true);
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _primary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                            ),
+                            child: const Text('Save Assessment', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      complaintCtrl.dispose();
+      flexionCtrl.dispose();
+      extensionCtrl.dispose();
+      passiveRomCtrl.dispose();
+      mmtCtrl.dispose();
+      limitationsCtrl.dispose();
+      goalCtrl.dispose();
+    }
   }
 
   Future<void> _openAddNoteModal() async {
@@ -363,7 +656,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
                               );
 
                               try {
-                                await PatientService().addSessionNote(
+                                await ClinicalService().createNote(
                                   patient.id ?? '1',
                                   note,
                                 );
@@ -731,7 +1024,19 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
           child: _QuickAction(
             icon: Icons.chat_bubble_outline_rounded,
             label: 'Message',
-            onTap: () => _showContactMessage('Message'),
+            onTap: () {
+              final patient = _patient;
+              if (patient != null) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PhysioChatScreen(
+                      patientId: patient.id ?? widget.patientId ?? '1',
+                      patientName: patient.name,
+                    ),
+                  ),
+                );
+              }
+            },
           ),
         ),
         const SizedBox(width: 10),
@@ -794,13 +1099,19 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
           _sectionTitle(
             'Current Condition',
             patient.condition,
+            actionLabel: 'Record / Edit',
+            onAction: _openRecordAssessmentModal,
           ),
           const SizedBox(height: 10),
 
-          _buildMetricsCard(
-            pain: '$pain/10',
-            flexion: flexion,
-            extension: extension,
+          InkWell(
+            onTap: _openRecordAssessmentModal,
+            borderRadius: BorderRadius.circular(19),
+            child: _buildMetricsCard(
+              pain: '$pain/10',
+              flexion: flexion,
+              extension: extension,
+            ),
           ),
 
           const SizedBox(height: 22),
@@ -1159,7 +1470,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
                     12,
                   ),
                   itemCount: notes.length,
-                  separatorBuilder: (_, __) =>
+                  separatorBuilder: (context, index) =>
                       const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final note = notes[index];
@@ -1224,7 +1535,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
         28,
       ),
       itemCount: bills.length,
-      separatorBuilder: (_, __) =>
+      separatorBuilder: (context, index) =>
           const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final bill = bills[index];
@@ -1402,8 +1713,10 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
 
   Widget _sectionTitle(
     String title,
-    String subtitle,
-  ) {
+    String subtitle, {
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
     return Row(
       crossAxisAlignment:
           CrossAxisAlignment.end,
@@ -1432,6 +1745,22 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
             ],
           ),
         ),
+        if (actionLabel != null && onAction != null)
+          InkWell(
+            onTap: onAction,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              child: Text(
+                actionLabel,
+                style: const TextStyle(
+                  color: _primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

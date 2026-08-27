@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../constants/patient_theme.dart';
+import '../../models/chat_model.dart';
+import '../../services/chat_service.dart';
 import 'patient_chat_screen.dart';
 import 'patient_components.dart';
 
@@ -12,38 +14,19 @@ class PatientMessagesScreen extends StatefulWidget {
 }
 
 class _PatientMessagesScreenState extends State<PatientMessagesScreen> {
+  final ChatService _chatService = ChatService();
   final TextEditingController _searchCtrl = TextEditingController();
+  List<ConversationModel> _conversations = [];
+  bool _isLoading = true;
+  String _searchQuery = '';
 
-  final List<Map<String, dynamic>> _conversations = [
-    {
-      'name': 'Dr. Vashu User',
-      'lastMsg': 'How are you feeling today?',
-      'time': '10:30 AM',
-      'unread': 1,
-      'isDoctor': true,
-    },
-    {
-      'name': 'Physio Clinic',
-      'lastMsg': 'Your appointment is confirmed for today.',
-      'time': 'Yesterday',
-      'unread': 0,
-      'isDoctor': false,
-    },
-    {
-      'name': 'Dr. Vashu User',
-      'lastMsg': 'Please share your exercise update when completed.',
-      'time': '15 Aug',
-      'unread': 0,
-      'isDoctor': true,
-    },
-    {
-      'name': 'PhysioVerse Support',
-      'lastMsg': 'Welcome to PhysioVerse! Need help with your routine?',
-      'time': '01 Aug',
-      'unread': 0,
-      'isDoctor': false,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _conversations = _chatService.cachedConversations;
+    _fetchConversations();
+    _chatService.connectWebSocket();
+  }
 
   @override
   void dispose() {
@@ -51,8 +34,34 @@ class _PatientMessagesScreenState extends State<PatientMessagesScreen> {
     super.dispose();
   }
 
+  Future<void> _fetchConversations() async {
+    setState(() => _isLoading = true);
+    try {
+      final convs = await _chatService.getConversations();
+      if (!mounted) return;
+      setState(() {
+        _conversations = convs;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
+  }
+
+  List<ConversationModel> get _filteredConversations {
+    if (_searchQuery.trim().isEmpty) return _conversations;
+    return _conversations
+        .where((c) =>
+            c.physiotherapistName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            c.lastMessageContent.toLowerCase().contains(_searchQuery.toLowerCase()))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filtered = _filteredConversations;
+
     return Scaffold(
       backgroundColor: PatientTheme.pageBg,
       appBar: AppBar(
@@ -76,6 +85,7 @@ class _PatientMessagesScreenState extends State<PatientMessagesScreen> {
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
             child: TextField(
               controller: _searchCtrl,
+              onChanged: (val) => setState(() => _searchQuery = val),
               style: const TextStyle(fontSize: 13, color: PatientTheme.textDark),
               decoration: InputDecoration(
                 hintText: 'Search messages',
@@ -92,110 +102,185 @@ class _PatientMessagesScreenState extends State<PatientMessagesScreen> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: PatientTheme.border),
                 ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: PatientTheme.primaryTeal, width: 1.5),
+                ),
               ),
             ),
           ),
 
           // Conversation List
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: _conversations.length,
-              itemBuilder: (context, index) {
-                final item = _conversations[index];
-                final unreadCount = item['unread'] as int;
-
-                return PatientCard(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(14),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => PatientChatScreen(doctorName: item['name'] as String),
-                      ),
-                    );
-                  },
-                  child: Row(
-                    children: [
-                      // Avatar
-                      CircleAvatar(
-                        radius: 22,
-                        backgroundColor: (item['isDoctor'] as bool)
-                            ? PatientTheme.primaryTealLight
-                            : PatientTheme.infoBlueBg,
-                        child: Icon(
-                          (item['isDoctor'] as bool) ? Icons.medical_services_rounded : Icons.local_hospital_rounded,
-                          color: (item['isDoctor'] as bool) ? PatientTheme.primaryTeal : PatientTheme.infoBlue,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-
-                      // Message details
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+            child: RefreshIndicator(
+              onRefresh: _fetchConversations,
+              color: PatientTheme.primaryTeal,
+              child: _isLoading && _conversations.isEmpty
+                  ? const Center(
+                      child: CircularProgressIndicator(color: PatientTheme.primaryTeal),
+                    )
+                  : filtered.isEmpty
+                      ? ListView(
+                          padding: const EdgeInsets.all(30),
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  item['name'] as String,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: PatientTheme.textDark,
-                                  ),
-                                ),
-                                Text(
-                                  item['time'] as String,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: PatientTheme.textMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    item['lastMsg'] as String,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
-                                      color: unreadCount > 0 ? PatientTheme.textDark : PatientTheme.textSecondary,
-                                    ),
-                                  ),
-                                ),
-                                if (unreadCount > 0)
+                            const SizedBox(height: 60),
+                            Center(
+                              child: Column(
+                                children: [
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                    decoration: const BoxDecoration(
-                                      color: PatientTheme.primaryTeal,
-                                      shape: BoxShape.circle,
+                                    width: 64,
+                                    height: 64,
+                                    decoration: BoxDecoration(
+                                      color: PatientTheme.primaryTealLight,
+                                      borderRadius: BorderRadius.circular(20),
                                     ),
-                                    child: Text(
-                                      '$unreadCount',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                    child: const Icon(
+                                      Icons.chat_bubble_outline_rounded,
+                                      color: PatientTheme.primaryTeal,
+                                      size: 32,
                                     ),
                                   ),
-                              ],
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'No Messages Yet',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: PatientTheme.textDark,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'Conversations with your assigned physiotherapist will appear here.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: PatientTheme.textMuted,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(20),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) {
+                            final item = filtered[index];
+                            final unreadCount = item.unreadCount;
+
+                            return PatientCard(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(14),
+                              onTap: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => PatientChatScreen(
+                                      conversationId: item.id,
+                                      doctorName: item.physiotherapistName,
+                                    ),
+                                  ),
+                                );
+                                _fetchConversations();
+                              },
+                              child: Row(
+                                children: [
+                                  // Avatar
+                                  CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: PatientTheme.primaryTealLight,
+                                    child: const Icon(
+                                      Icons.medical_services_rounded,
+                                      color: PatientTheme.primaryTeal,
+                                      size: 22,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+
+                                  // Message details
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                item.physiotherapistName,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: PatientTheme.textDark,
+                                                ),
+                                              ),
+                                            ),
+                                            Text(
+                                              item.timeFormatted,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: unreadCount > 0
+                                                    ? PatientTheme.primaryTeal
+                                                    : PatientTheme.textMuted,
+                                                fontWeight: unreadCount > 0
+                                                    ? FontWeight.bold
+                                                    : FontWeight.normal,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                item.lastMessageContent.isEmpty
+                                                    ? 'Conversation started'
+                                                    : item.lastMessageContent,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 12.5,
+                                                  color: unreadCount > 0
+                                                      ? PatientTheme.textDark
+                                                      : PatientTheme.textSecondary,
+                                                  fontWeight: unreadCount > 0
+                                                      ? FontWeight.w600
+                                                      : FontWeight.normal,
+                                                ),
+                                              ),
+                                            ),
+                                            if (unreadCount > 0)
+                                              Container(
+                                                margin: const EdgeInsets.only(left: 8),
+                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: PatientTheme.primaryTeal,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: Text(
+                                                  '$unreadCount',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                 ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
             ),
           ),
         ],

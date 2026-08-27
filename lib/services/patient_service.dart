@@ -2,6 +2,7 @@ import '../core/network/api_client.dart';
 import '../models/clinical_models.dart';
 import '../models/exercise_model.dart';
 import '../models/patient_model.dart';
+import 'clinical_service.dart';
 
 class PatientService {
   factory PatientService({ApiClient? apiClient}) {
@@ -542,6 +543,24 @@ class PatientService {
   }
 
   Future<PatientModel> getPatientById(String id) async {
+    try {
+      final response = await _apiClient.get<PatientModel>(
+        '/patients/$id',
+        fromJson: (json) => PatientModel.fromJson(json as Map<String, dynamic>),
+      );
+
+      if (response.success && response.data != null) {
+        var patient = response.data!;
+        // Load latest clinical assessment and session notes from live backend
+        final latestAssessment = await ClinicalService().getLatestAssessment(id);
+        final notes = await ClinicalService().getNotes(id);
+        return patient.copyWith(
+          assessment: latestAssessment ?? patient.assessment,
+          sessionNotes: notes.isNotEmpty ? notes : patient.sessionNotes,
+        );
+      }
+    } catch (_) {}
+
     final match = _localPatientsStore.firstWhere(
       (p) => p.id == id,
       orElse: () => _localPatientsStore.first,
@@ -643,6 +662,10 @@ class PatientService {
 
   /// Save or update clinical assessment for a patient (V1-05)
   Future<void> saveAssessment(String patientId, AssessmentModel assessment) async {
+    try {
+      await ClinicalService().createAssessment(patientId, assessment);
+    } catch (_) {}
+
     final index = _localPatientsStore.indexWhere((p) => p.id == patientId);
     if (index != -1) {
       final updated = _localPatientsStore[index].copyWith(assessment: assessment);
@@ -683,6 +706,10 @@ class PatientService {
 
   /// Add a SOAP treatment session note with previous session context (V1-06)
   Future<void> addSessionNote(String patientId, SessionNoteModel note) async {
+    try {
+      await ClinicalService().createNote(patientId, note);
+    } catch (_) {}
+
     final index = _localPatientsStore.indexWhere((p) => p.id == patientId);
     if (index != -1) {
       final currentNotes = List<SessionNoteModel>.from(_localPatientsStore[index].sessionNotes);

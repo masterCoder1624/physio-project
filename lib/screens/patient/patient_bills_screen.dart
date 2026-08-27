@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/storage/local_storage_service.dart';
 import '../../models/patient_model.dart';
 import '../../services/patient_service.dart';
 import '../../services/pdf_invoice_service.dart';
@@ -32,12 +33,24 @@ class _PatientBillsScreenState extends State<PatientBillsScreen> {
   }
 
   Future<void> _loadBills() async {
-    final p = await PatientService().getPatientById(widget.patientId);
-    if (!mounted) return;
-    setState(() {
-      _patient = p;
-      _isLoading = false;
-    });
+    try {
+      String targetId = widget.patientId;
+      if (targetId == '1' || targetId.isEmpty) {
+        final currentUid = await LocalStorageService.getUserId();
+        if (currentUid != null && currentUid.isNotEmpty) {
+          targetId = currentUid;
+        }
+      }
+      final p = await PatientService().getPatientById(targetId);
+      if (!mounted) return;
+      setState(() {
+        _patient = p;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
   }
 
   @override

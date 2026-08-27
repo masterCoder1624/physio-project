@@ -1,28 +1,34 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../constants/patient_theme.dart';
 import '../../core/storage/local_storage_service.dart';
 import '../../models/chat_model.dart';
 import '../../services/chat_service.dart';
 
-/// Screen 18 — Doctor Chat Screen (matching media_1787385006975.jpg)
-class PatientChatScreen extends StatefulWidget {
-  const PatientChatScreen({
+const Color _shellCyan = Color(0xFF00AFC1);
+const Color _shellLightCyan = Color(0xFFE8F9FB);
+const Color _shellText = Color(0xFF123047);
+const Color _shellMuted = Color(0xFF64748B);
+const Color _shellBg = Color(0xFFF7FAFC);
+const Color _shellBorder = Color(0xFFE2E8F0);
+const Color _onlineGreen = Color(0xFF10B981);
+
+class PhysioChatScreen extends StatefulWidget {
+  const PhysioChatScreen({
     super.key,
     this.conversationId,
-    this.doctorName = 'Dr. Physiotherapist',
-    this.patientId,
+    required this.patientId,
+    required this.patientName,
   });
 
   final String? conversationId;
-  final String doctorName;
-  final String? patientId;
+  final String patientId;
+  final String patientName;
 
   @override
-  State<PatientChatScreen> createState() => _PatientChatScreenState();
+  State<PhysioChatScreen> createState() => _PhysioChatScreenState();
 }
 
-class _PatientChatScreenState extends State<PatientChatScreen> {
+class _PhysioChatScreenState extends State<PhysioChatScreen> {
   final ChatService _chatService = ChatService();
   final TextEditingController _msgCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
@@ -55,8 +61,7 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
     await _chatService.connectWebSocket();
 
     if (_conversationId == null || _conversationId!.isEmpty) {
-      final pId = widget.patientId ?? _currentUserId ?? 'me';
-      final conv = await _chatService.getOrCreateConversation(pId);
+      final conv = await _chatService.getOrCreateConversation(widget.patientId);
       if (conv != null) {
         _conversationId = conv.id;
       }
@@ -152,10 +157,10 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
     final tempMsg = ChatMessageModel(
       id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
       conversationId: _conversationId!,
-      senderId: _currentUserId ?? 'patient',
-      senderRole: 'patient',
+      senderId: _currentUserId ?? 'physio',
+      senderRole: 'physiotherapist',
       senderName: 'You',
-      recipientId: 'physio',
+      recipientId: widget.patientId,
       content: text,
       isRead: false,
       createdAt: DateTime.now(),
@@ -175,138 +180,70 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
     }
   }
 
-  void _showAttachmentOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildAttachOption(Icons.image_rounded, 'Photo', Colors.purple, () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Select photo from gallery')),
-                  );
-                }),
-                _buildAttachOption(Icons.camera_alt_rounded, 'Camera', Colors.pink, () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Open camera')),
-                  );
-                }),
-                _buildAttachOption(Icons.insert_drive_file_rounded, 'Document', Colors.blue, () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Select document to share')),
-                  );
-                }),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildAttachOption(IconData icon, String label, Color color, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: color.withValues(alpha: 0.12),
-            child: Icon(icon, color: color, size: 26),
-          ),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: PatientTheme.textDark)),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final initials = widget.patientName.trim().split(RegExp(r'\s+')).take(2).map((e) => e.isNotEmpty ? e[0].toUpperCase() : '').join();
+
     return Scaffold(
-      backgroundColor: PatientTheme.pageBg,
+      backgroundColor: _shellBg,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: PatientTheme.textDark),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: _shellText),
           onPressed: () => Navigator.of(context).pop(),
         ),
         titleSpacing: 0,
         title: Row(
           children: [
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: PatientTheme.primaryTealLight,
-                  child: const Icon(Icons.medical_services_rounded, color: PatientTheme.primaryTeal, size: 20),
+            CircleAvatar(
+              radius: 19,
+              backgroundColor: _shellLightCyan,
+              child: Text(
+                initials.isEmpty ? 'PT' : initials,
+                style: const TextStyle(
+                  color: _shellCyan,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
                 ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: PatientTheme.successGreen,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
             const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.doctorName,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: PatientTheme.textDark),
+                  widget.patientName,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _shellText),
                 ),
-                const Text(
-                  'Online',
-                  style: TextStyle(fontSize: 11, color: PatientTheme.successGreen, fontWeight: FontWeight.w500),
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        color: _onlineGreen,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    const Text(
+                      'Active Patient',
+                      style: TextStyle(fontSize: 11, color: _onlineGreen, fontWeight: FontWeight.w600),
+                    ),
+                  ],
                 ),
               ],
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.videocam_outlined, color: PatientTheme.primaryTeal),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Starting video consultation...')),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.more_vert_rounded, color: PatientTheme.textDark),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: Column(
         children: [
-          // Messages ListView
+          // Message List
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: PatientTheme.primaryTeal))
+                ? const Center(child: CircularProgressIndicator(color: _shellCyan))
                 : _messages.isEmpty
                     ? Center(
                         child: Column(
@@ -316,20 +253,20 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
                               width: 56,
                               height: 56,
                               decoration: BoxDecoration(
-                                color: PatientTheme.primaryTealLight,
+                                color: _shellLightCyan,
                                 borderRadius: BorderRadius.circular(18),
                               ),
-                              child: const Icon(Icons.chat_bubble_outline_rounded, color: PatientTheme.primaryTeal, size: 28),
+                              child: const Icon(Icons.chat_bubble_outline_rounded, color: _shellCyan, size: 28),
                             ),
                             const SizedBox(height: 12),
                             const Text(
                               'Start the Conversation',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: PatientTheme.textDark),
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: _shellText),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Send a message to ${widget.doctorName}',
-                              style: const TextStyle(fontSize: 12, color: PatientTheme.textMuted),
+                              'Send a message to ${widget.patientName}',
+                              style: const TextStyle(fontSize: 12, color: _shellMuted),
                             ),
                           ],
                         ),
@@ -340,29 +277,29 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
                         itemCount: _messages.length,
                         itemBuilder: (context, index) {
                           final msg = _messages[index];
-                          final isMe = msg.senderRole == 'patient' || msg.senderId == _currentUserId;
+                          final isMe = msg.senderRole == 'physiotherapist' || msg.senderId == _currentUserId;
 
                           return Align(
                             alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                             child: Container(
-                              margin: const EdgeInsets.only(bottom: 12),
+                              margin: const EdgeInsets.only(bottom: 10),
                               constraints: BoxConstraints(
-                                maxWidth: MediaQuery.of(context).size.width * 0.75,
+                                maxWidth: MediaQuery.of(context).size.width * 0.76,
                               ),
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                               decoration: BoxDecoration(
-                                color: isMe ? PatientTheme.primaryTeal : Colors.white,
+                                color: isMe ? _shellCyan : Colors.white,
                                 borderRadius: BorderRadius.only(
                                   topLeft: const Radius.circular(16),
                                   topRight: const Radius.circular(16),
                                   bottomLeft: Radius.circular(isMe ? 16 : 4),
                                   bottomRight: Radius.circular(isMe ? 4 : 16),
                                 ),
-                                border: isMe ? null : Border.all(color: PatientTheme.border),
+                                border: isMe ? null : Border.all(color: _shellBorder),
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.black.withValues(alpha: 0.03),
-                                    blurRadius: 6,
+                                    blurRadius: 4,
                                     offset: const Offset(0, 2),
                                   ),
                                 ],
@@ -373,8 +310,8 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
                                   Text(
                                     msg.content,
                                     style: TextStyle(
-                                      fontSize: 13,
-                                      color: isMe ? Colors.white : PatientTheme.textDark,
+                                      color: isMe ? Colors.white : _shellText,
+                                      fontSize: 13.5,
                                       height: 1.35,
                                     ),
                                   ),
@@ -385,8 +322,8 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
                                       Text(
                                         msg.timeFormatted,
                                         style: TextStyle(
+                                          color: isMe ? Colors.white.withValues(alpha: 0.75) : _shellMuted,
                                           fontSize: 10,
-                                          color: isMe ? Colors.white.withValues(alpha: 0.8) : PatientTheme.textMuted,
                                         ),
                                       ),
                                       if (isMe) ...[
@@ -407,38 +344,51 @@ class _PatientChatScreenState extends State<PatientChatScreen> {
                       ),
           ),
 
-          // Chat Input Bar
+          // Input Bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: const BoxDecoration(
               color: Colors.white,
-              border: Border(top: BorderSide(color: PatientTheme.border)),
+              border: Border(top: BorderSide(color: _shellBorder)),
             ),
             child: SafeArea(
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline_rounded, color: PatientTheme.primaryTeal, size: 24),
-                    onPressed: () {
-                      _showAttachmentOptions(context);
-                    },
-                  ),
                   Expanded(
-                    child: TextField(
-                      controller: _msgCtrl,
-                      style: const TextStyle(fontSize: 13.5, color: PatientTheme.textDark),
-                      decoration: const InputDecoration(
-                        hintText: 'Type a message...',
-                        hintStyle: TextStyle(color: PatientTheme.textMuted, fontSize: 13),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: _shellBg,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: _shellBorder),
                       ),
-                      onSubmitted: (_) => _sendMessage(),
+                      child: TextField(
+                        controller: _msgCtrl,
+                        textCapitalization: TextCapitalization.sentences,
+                        maxLines: 4,
+                        minLines: 1,
+                        style: const TextStyle(fontSize: 13.5, color: _shellText),
+                        decoration: const InputDecoration(
+                          hintText: 'Type message...',
+                          hintStyle: TextStyle(color: _shellMuted, fontSize: 13),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        ),
+                        onSubmitted: (_) => _sendMessage(),
+                      ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.send_rounded, color: PatientTheme.primaryTeal, size: 22),
-                    onPressed: _sendMessage,
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(
+                      color: _shellCyan,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                      onPressed: _sendMessage,
+                    ),
                   ),
                 ],
               ),

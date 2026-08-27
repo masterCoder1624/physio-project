@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import '../../constants/patient_theme.dart';
+import '../../core/storage/local_storage_service.dart';
+import '../../models/clinical_models.dart';
+import '../../services/clinical_service.dart';
 import 'patient_components.dart';
-import 'patient_documents_screen.dart';
 
-/// Screen 13 — Medical Records Screen (matching media_1787385006975.jpg)
+/// Screen 13 — Medical Records Screen
 class PatientRecordsScreen extends StatefulWidget {
-  const PatientRecordsScreen({super.key});
+  const PatientRecordsScreen({super.key, this.patientId});
+
+  final String? patientId;
 
   @override
   State<PatientRecordsScreen> createState() => _PatientRecordsScreenState();
@@ -13,17 +17,46 @@ class PatientRecordsScreen extends StatefulWidget {
 
 class _PatientRecordsScreenState extends State<PatientRecordsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _isLoading = false;
+  AssessmentModel? _latestAssessment;
+  List<SessionNoteModel> _notes = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _fetchRecords();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchRecords() async {
+    setState(() => _isLoading = true);
+    try {
+      String? pId = widget.patientId;
+      if (pId == null || pId.isEmpty) {
+        pId = await LocalStorageService.getUserId();
+      }
+
+      if (pId != null && pId.isNotEmpty) {
+        final assessment = await ClinicalService().getLatestAssessment(pId);
+        final notes = await ClinicalService().getNotes(pId);
+        if (!mounted) return;
+        setState(() {
+          _latestAssessment = assessment;
+          _notes = notes;
+          _isLoading = false;
+        });
+        return;
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
   }
 
   @override
@@ -58,126 +91,137 @@ class _PatientRecordsScreenState extends State<PatientRecordsScreen> with Single
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: PatientTheme.primaryTeal))
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                _buildOverviewTab(),
+                _buildPrescriptionsTab(),
+                _buildReportsTab(),
+                _buildNotesTab(),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildOverviewTab() {
+    final assessment = _latestAssessment;
+
+    return RefreshIndicator(
+      onRefresh: _fetchRecords,
+      color: PatientTheme.primaryTeal,
+      child: ListView(
+        padding: const EdgeInsets.all(20),
         children: [
-          _buildOverviewTab(),
-          _buildPrescriptionsTab(),
-          _buildReportsTab(),
-          _buildNotesTab(),
+          // Diagnosis Card
+          PatientCard(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Diagnosis / Condition',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: PatientTheme.primaryTeal),
+                    ),
+                    Text(
+                      assessment != null ? 'Assessed on ${assessment.date}' : 'Clinical Record',
+                      style: const TextStyle(fontSize: 11, color: PatientTheme.textMuted),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  assessment?.chiefComplaint ?? 'General Rehabilitation',
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: PatientTheme.textDark,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  assessment != null
+                      ? 'Pain Level: ${assessment.painLevel}/10 • Flexion: ${assessment.activeRomFlexion} • Strength: ${assessment.muscleStrengthMMT}'
+                      : 'Initial assessment will be performed by your assigned physiotherapist.',
+                  style: const TextStyle(fontSize: 12.5, color: PatientTheme.textSecondary, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Physiotherapist Notes Card
+          PatientCard(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Clinical Goals & Instructions',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: PatientTheme.textDark),
+                    ),
+                    Text(
+                      assessment?.date ?? '',
+                      style: const TextStyle(fontSize: 11, color: PatientTheme.textMuted),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: PatientTheme.primaryTealLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    assessment?.clinicalGoal ??
+                        'Follow your assigned daily home exercise program. Contact your physiotherapist for any sharp pain.',
+                    style: const TextStyle(fontSize: 12.5, color: PatientTheme.textDark, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Treatment History Timeline
+          PatientCard(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Recent Session Activity',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: PatientTheme.textDark),
+                ),
+                const SizedBox(height: 14),
+                if (_notes.isEmpty)
+                  const Text(
+                    'No session notes recorded yet.',
+                    style: TextStyle(fontSize: 12, color: PatientTheme.textMuted),
+                  )
+                else
+                  ..._notes.take(3).map((n) => _buildHistoryRow(
+                        'Session #${n.sessionNumber}: ${n.objectiveFindings.isNotEmpty ? n.objectiveFindings : n.treatmentRendered}',
+                        n.date,
+                        Icons.check_circle_rounded,
+                      )),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildOverviewTab() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        // Diagnosis Card (matching screenshot)
-        PatientCard(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text(
-                    'Diagnosis',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: PatientTheme.primaryTeal),
-                  ),
-                  Text(
-                    'Diagnosed on 08 Aug 2026',
-                    style: TextStyle(fontSize: 11, color: PatientTheme.textMuted),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Patellofemoral Pain Syndrome',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: PatientTheme.textDark,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Right anterior knee joint inflammation with mild quadriceps muscle imbalance.',
-                style: TextStyle(fontSize: 12.5, color: PatientTheme.textSecondary, height: 1.35),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Physiotherapist Notes Card
-        PatientCard(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text(
-                    'Physiotherapist Notes',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: PatientTheme.textDark),
-                  ),
-                  Text('08 Aug 2026', style: TextStyle(fontSize: 11, color: PatientTheme.textMuted)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: PatientTheme.primaryTealLight,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Focus on strengthening exercises and avoid deep knee bending. Ice knee for 15 mins after heavy sessions. Consistency is key to full recovery.',
-                  style: TextStyle(fontSize: 12.5, color: PatientTheme.textDark, height: 1.4),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Treatment History Timeline
-        PatientCard(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Treatment History',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: PatientTheme.textDark),
-              ),
-              const SizedBox(height: 14),
-              _buildHistoryRow('Knee pain initial assessment', '08 Aug 2026', Icons.check_circle_rounded),
-              _buildHistoryRow('Knee mobility improvement test', '15 Aug 2026', Icons.check_circle_rounded),
-              _buildHistoryRow('Strength training protocol started', '20 Aug 2026', Icons.radio_button_checked_rounded, isLast: true),
-              const SizedBox(height: 16),
-
-              SecondaryOutlineButton(
-                label: 'View All Records',
-                icon: Icons.folder_open_rounded,
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const PatientDocumentsScreen()),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHistoryRow(String title, String date, IconData icon, {bool isLast = false}) {
+  Widget _buildHistoryRow(String title, String date, IconData icon) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -187,9 +231,12 @@ class _PatientRecordsScreenState extends State<PatientRecordsScreen> with Single
           Expanded(
             child: Text(
               title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: PatientTheme.textDark),
             ),
           ),
+          const SizedBox(width: 8),
           Text(
             date,
             style: const TextStyle(fontSize: 11, color: PatientTheme.textMuted),
@@ -217,9 +264,9 @@ class _PatientRecordsScreenState extends State<PatientRecordsScreen> with Single
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
-                    Text('Prescription - August 2026', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: PatientTheme.textDark)),
+                    Text('Active Home Exercise Plan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: PatientTheme.textDark)),
                     SizedBox(height: 2),
-                    Text('Dr. Vashu User • 4 Prescribed exercises', style: TextStyle(fontSize: 12, color: PatientTheme.textSecondary)),
+                    Text('Prescribed by your physiotherapist', style: TextStyle(fontSize: 12, color: PatientTheme.textSecondary)),
                   ],
                 ),
               ),
@@ -249,9 +296,9 @@ class _PatientRecordsScreenState extends State<PatientRecordsScreen> with Single
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
-                    Text('Right Knee MRI Report', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: PatientTheme.textDark)),
+                    Text('Diagnostic Reports Vault', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: PatientTheme.textDark)),
                     SizedBox(height: 2),
-                    Text('Apex Diagnostic Center • 10 Aug 2026', style: TextStyle(fontSize: 12, color: PatientTheme.textSecondary)),
+                    Text('Uploaded medical imaging and labs', style: TextStyle(fontSize: 12, color: PatientTheme.textSecondary)),
                   ],
                 ),
               ),
@@ -264,25 +311,88 @@ class _PatientRecordsScreenState extends State<PatientRecordsScreen> with Single
   }
 
   Widget _buildNotesTab() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        PatientCard(
+    if (_notes.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(30),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text('Session 3 Clinical Observation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              SizedBox(height: 4),
-              Text('18 Aug 2026 • Dr. Vashu User', style: TextStyle(fontSize: 11, color: PatientTheme.textMuted)),
-              SizedBox(height: 10),
-              Text(
-                'Patient reports 40% reduction in morning joint stiffness. Knee flexion increased from 105° to 125°. Continue Phase 2 mobility exercises.',
-                style: TextStyle(fontSize: 12.5, color: PatientTheme.textDark, height: 1.4),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: PatientTheme.primaryTealLight,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(Icons.note_alt_outlined, color: PatientTheme.primaryTeal, size: 28),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'No Clinical Notes Yet',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: PatientTheme.textDark),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Notes recorded during your physiotherapy sessions will appear here.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: PatientTheme.textMuted, height: 1.4),
               ),
             ],
           ),
         ),
-      ],
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _fetchRecords,
+      color: PatientTheme.primaryTeal,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(20),
+        itemCount: _notes.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final note = _notes[index];
+          return PatientCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Session #${note.sessionNumber} Clinical Note',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: PatientTheme.textDark),
+                    ),
+                    Text(
+                      'Pain: ${note.painLevel}/10',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: PatientTheme.primaryTeal),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${note.date} • ${note.therapistName}',
+                  style: const TextStyle(fontSize: 11, color: PatientTheme.textMuted),
+                ),
+                const SizedBox(height: 10),
+                if (note.objectiveFindings.isNotEmpty)
+                  Text(
+                    note.objectiveFindings,
+                    style: const TextStyle(fontSize: 12.5, color: PatientTheme.textDark, height: 1.4),
+                  ),
+                if (note.planForNextSession.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Plan: ${note.planForNextSession}',
+                    style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: PatientTheme.textSecondary),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }

@@ -333,19 +333,31 @@ class _GaugePainter extends CustomPainter {
 
 /// Weekly Activity Bar Chart (Monday to Sunday)
 class WeeklyActivityBarChart extends StatelessWidget {
-  const WeeklyActivityBarChart({super.key});
+  const WeeklyActivityBarChart({
+    super.key,
+    this.values,
+    this.days = const ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+    this.todayIndex,
+  });
 
-  final List<double> values = const [0.7, 0.9, 0.8, 1.0, 0.85, 0.4, 0.2];
-  final List<String> days = const ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  final List<double>? values;
+  final List<String> days;
+  final int? todayIndex;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveValues = values != null && values!.isNotEmpty
+        ? values!
+        : const [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    final activeToday = todayIndex ?? (DateTime.now().weekday - 1).clamp(0, 6);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: List.generate(7, (index) {
-        final isToday = index == 3; // Thursday (mock current day)
-        final heightPct = values[index];
+        final isToday = index == activeToday;
+        final rawPct = index < effectiveValues.length ? effectiveValues[index] : 0.0;
+        final heightPct = rawPct.clamp(0.0, 1.0);
 
         return Column(
           children: [
@@ -359,16 +371,18 @@ class WeeklyActivityBarChart extends StatelessWidget {
               alignment: Alignment.bottomCenter,
               child: Container(
                 width: 28,
-                height: 70 * heightPct,
+                height: 70 * (heightPct > 0 ? heightPct : 0.05),
                 decoration: BoxDecoration(
-                  color: isToday ? PatientTheme.primaryTeal : const Color(0xFF99DFD3),
+                  color: isToday
+                      ? PatientTheme.primaryTeal
+                      : (heightPct > 0 ? const Color(0xFF99DFD3) : PatientTheme.borderLight),
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
             ),
             const SizedBox(height: 6),
             Text(
-              days[index],
+              index < days.length ? days[index] : '',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: isToday ? FontWeight.bold : FontWeight.w600,
@@ -384,7 +398,12 @@ class WeeklyActivityBarChart extends StatelessWidget {
 
 /// Line Chart Graph Painter for Progress Over Time
 class ProgressLineChart extends StatelessWidget {
-  const ProgressLineChart({super.key});
+  const ProgressLineChart({
+    super.key,
+    this.values,
+  });
+
+  final List<double>? values;
 
   @override
   Widget build(BuildContext context) {
@@ -392,13 +411,16 @@ class ProgressLineChart extends StatelessWidget {
       height: 120,
       width: double.infinity,
       child: CustomPaint(
-        painter: _LineChartPainter(),
+        painter: _LineChartPainter(values: values),
       ),
     );
   }
 }
 
 class _LineChartPainter extends CustomPainter {
+  _LineChartPainter({this.values});
+  final List<double>? values;
+
   @override
   void paint(Canvas canvas, Size size) {
     final linePaint = Paint()
@@ -416,27 +438,36 @@ class _LineChartPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5;
 
-    final points = [
-      Offset(10, size.height * 0.85),
-      Offset(size.width * 0.22, size.height * 0.70),
-      Offset(size.width * 0.44, size.height * 0.55),
-      Offset(size.width * 0.66, size.height * 0.35),
-      Offset(size.width * 0.88, size.height * 0.20),
-    ];
+    final effectiveValues = values != null && values!.isNotEmpty
+        ? values!
+        : const [15.0, 30.0, 45.0, 65.0, 80.0];
 
-    final path = Path();
-    path.moveTo(points.first.dx, points.first.dy);
-    for (int i = 1; i < points.length; i++) {
-      path.lineTo(points[i].dx, points[i].dy);
+    final n = effectiveValues.length;
+    final points = <Offset>[];
+
+    for (int i = 0; i < n; i++) {
+      final x = n == 1 ? size.width / 2 : 10 + (size.width - 20) * (i / (n - 1));
+      final val = effectiveValues[i].clamp(0.0, 100.0);
+      final y = size.height * (0.9 - (val / 100.0) * 0.75);
+      points.add(Offset(x, y));
     }
-    canvas.drawPath(path, linePaint);
 
-    for (final p in points) {
-      canvas.drawCircle(p, 5, dotPaint);
-      canvas.drawCircle(p, 5, dotBorderPaint);
+    if (points.isNotEmpty) {
+      final path = Path();
+      path.moveTo(points.first.dx, points.first.dy);
+      for (int i = 1; i < points.length; i++) {
+        path.lineTo(points[i].dx, points[i].dy);
+      }
+      canvas.drawPath(path, linePaint);
+
+      for (final p in points) {
+        canvas.drawCircle(p, 5, dotPaint);
+        canvas.drawCircle(p, 5, dotBorderPaint);
+      }
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _LineChartPainter oldDelegate) =>
+      oldDelegate.values != values;
 }

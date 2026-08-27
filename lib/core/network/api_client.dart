@@ -59,6 +59,19 @@ class ApiClient {
     );
   }
 
+  Future<ApiResponse<T>> patch<T>(
+    String path, {
+    dynamic body,
+    T Function(dynamic json)? fromJson,
+  }) async {
+    return _sendRequest<T>(
+      'PATCH',
+      path,
+      body: body,
+      fromJson: fromJson,
+    );
+  }
+
   Future<ApiResponse<T>> delete<T>(
     String path, {
     T Function(dynamic json)? fromJson,
@@ -102,6 +115,11 @@ class ApiClient {
         case 'PUT':
           response = await http
               .put(uri, headers: headers, body: encodedBody)
+              .timeout(timeoutDuration);
+          break;
+        case 'PATCH':
+          response = await http
+              .patch(uri, headers: headers, body: encodedBody)
               .timeout(timeoutDuration);
           break;
         case 'DELETE':

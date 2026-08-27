@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../../constants/patient_theme.dart';
 import '../../models/appointment_model.dart';
 import '../../models/exercise_model.dart';
+import '../../models/progress_model.dart';
 import '../../services/appointment_service.dart';
 import '../../services/exercise_service.dart';
+import '../../services/progress_service.dart';
 import 'appointment_detail_screen.dart';
 import 'exercise_detail_screen.dart';
 import 'exercise_list_screen.dart';
@@ -26,10 +28,12 @@ class PatientDashboard extends StatefulWidget {
 class _PatientDashboardState extends State<PatientDashboard> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ExerciseService _exerciseService = ExerciseService();
+  final ProgressService _progressService = ProgressService();
   String _progressFilter = 'This Month';
   AppointmentModel? _upcomingAppointment;
   TodayPlanModel? _todayPlan;
   PatientProgramModel? _activeProgram;
+  PatientProgressModel? _progressData;
 
   @override
   void initState() {
@@ -42,9 +46,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
     try {
       final plan = await _exerciseService.getTodayPlan();
       final progs = await _exerciseService.getMyPrograms();
+      final progress = await _progressService.getMyProgress(period: _progressFilter);
       if (!mounted) return;
       setState(() {
         _todayPlan = plan;
+        _progressData = progress;
         if (progs.isNotEmpty) {
           _activeProgram = progs.first;
         }
@@ -296,14 +302,14 @@ class _PatientDashboardState extends State<PatientDashboard> {
                       Expanded(
                         child: _buildMetricStatCard(
                           title: 'Overall Progress',
-                          value: _todayPlan != null ? '${_todayPlan!.progressPercentage}%' : '0%',
-                          subtitle: 'Improving',
+                          value: _progressData != null ? '${_progressData!.overallPercentage}%' : (_todayPlan != null ? '${_todayPlan!.progressPercentage}%' : '0%'),
+                          subtitle: _progressData?.progressSubtitle ?? 'Improving',
                           color: PatientTheme.successGreen,
                           icon: Icons.trending_up_rounded,
                           onTap: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(builder: (_) => const PatientProgressScreen()),
-                            );
+                            ).then((_) => _loadDashboardData());
                           },
                         ),
                       ),
@@ -337,8 +343,13 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                 items: ['This Week', 'This Month', '3 Months']
                                     .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                                     .toList(),
-                                onChanged: (v) {
-                                  if (v != null) setState(() => _progressFilter = v);
+                                onChanged: (v) async {
+                                  if (v != null) {
+                                    setState(() => _progressFilter = v);
+                                    final progress = await _progressService.getMyProgress(period: v);
+                                    if (!mounted) return;
+                                    setState(() => _progressData = progress);
+                                  }
                                 },
                               ),
                             ),
@@ -349,8 +360,8 @@ class _PatientDashboardState extends State<PatientDashboard> {
                         // Gauge
                         Center(
                           child: CircularProgressGauge(
-                            progress: ((_todayPlan?.progressPercentage ?? 0) / 100.0).clamp(0.0, 1.0),
-                            subtitle: 'Good Progress',
+                            progress: ((_progressData?.overallPercentage ?? _todayPlan?.progressPercentage ?? 0) / 100.0).clamp(0.0, 1.0),
+                            subtitle: _progressData?.progressSubtitle ?? 'Good Progress',
                           ),
                         ),
                         const SizedBox(height: 14),
@@ -361,11 +372,19 @@ class _PatientDashboardState extends State<PatientDashboard> {
                           children: [
                             _BreakdownPill(
                               label: 'Completed',
-                              value: '${_todayPlan?.progressPercentage ?? 0}%',
+                              value: '${_progressData?.completedCount ?? _todayPlan?.completedExercises ?? 0}',
                               color: PatientTheme.successGreen,
                             ),
-                            const _BreakdownPill(label: 'In Progress', value: '15%', color: PatientTheme.infoBlue),
-                            const _BreakdownPill(label: 'Pending', value: '7%', color: PatientTheme.warningOrange),
+                            _BreakdownPill(
+                              label: 'In Progress',
+                              value: '${_progressData?.inProgressCount ?? 0}',
+                              color: PatientTheme.infoBlue,
+                            ),
+                            _BreakdownPill(
+                              label: 'Pending',
+                              value: '${_progressData?.pendingCount ?? 0}',
+                              color: PatientTheme.warningOrange,
+                            ),
                           ],
                         ),
                       ],
@@ -378,8 +397,8 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     padding: const EdgeInsets.all(18),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
+                      children: [
+                        const Text(
                           'Weekly Activity',
                           style: TextStyle(
                             fontSize: 14,
@@ -387,8 +406,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
                             color: PatientTheme.textDark,
                           ),
                         ),
-                        SizedBox(height: 16),
-                        WeeklyActivityBarChart(),
+                        const SizedBox(height: 16),
+                        WeeklyActivityBarChart(
+                          values: _progressData?.exerciseCompliance.weeklyActivity.map((w) => w.completionRate).toList(),
+                          days: _progressData?.exerciseCompliance.weeklyActivity.map((w) => w.day).toList() ?? const ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+                        ),
                       ],
                     ),
                   ),

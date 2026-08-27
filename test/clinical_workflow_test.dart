@@ -1,8 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_application_1/models/clinical_models.dart';
 import 'package:flutter_application_1/services/patient_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  SharedPreferences.setMockInitialValues({});
+
   group('PhysioVerse V1 Clinical Workflow & Release Gate Tests', () {
     final patientService = PatientService();
 

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../../services/chat_service.dart';
 import '../../services/patient_service.dart';
 import 'calendar_screen.dart';
 import 'patient_detail_screen.dart';
 import 'patient_list_screen.dart';
+import 'physio_messages_screen.dart';
 import 'profile_screen.dart';
 import 'physio_navigation.dart';
 import 'physio_main_shell.dart';
@@ -44,7 +46,7 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
   int _todayPatientsCount = 0;
   final int _pendingBookingsCount = 0;
   final int _completedThisWeek = 0;
-  final double _monthlyRevenue = 0;
+  int _unreadMessagesCount = 0;
   List<DashboardPatient> _todayPatients = [];
   int _selectedIndex = 0;
 
@@ -64,8 +66,10 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
     try {
       final userFuture = AuthService().getProfile();
       final patientsFuture = PatientService().getPatients();
+      final unreadFuture = ChatService().getUnreadCount();
       final user = await userFuture;
       final patientModels = await patientsFuture;
+      final unread = await unreadFuture;
 
       final patients = patientModels.map((p) => DashboardPatient(
         id: p.id ?? '',
@@ -82,6 +86,7 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
         _specialty = 'Sports & Orthopedic Physiotherapy';
         _todayPatientsCount = patients.length;
         _todayPatients = patients;
+        _unreadMessagesCount = unread;
         _isLoading = false;
       });
     } catch (_) {
@@ -164,6 +169,38 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
               Stack(
                 clipBehavior: Clip.none,
                 children: [
+                  _headerIconButton(
+                    Icons.chat_bubble_outline_rounded,
+                    () => _navigateTo(const PhysioMessagesScreen()),
+                  ),
+                  if (_unreadMessagesCount > 0)
+                    Positioned(
+                      right: 0,
+                      top: -1,
+                      child: Container(
+                        width: 19,
+                        height: 19,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(
+                          color: kCoral,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '$_unreadMessagesCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 8),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
                   _headerIconButton(Icons.notifications_none_rounded, () {}),
                   Positioned(
                     right: 0, top: -1,
@@ -241,20 +278,24 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
   }
 
   Widget _buildProfileAvatar() {
-    return Container(
-      width: 68, height: 68,
-      decoration: BoxDecoration(
-        color: Colors.white, shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withValues(alpha: .8), width: 3),
-        boxShadow: [BoxShadow(
-          color: Colors.black.withValues(alpha: .12), blurRadius: 12, offset: const Offset(0, 5),
-        )],
-      ),
-      child: CircleAvatar(
-        backgroundColor: kLightCyan,
-        child: Text(_getInitials(_physioName), style: const TextStyle(
-          color: kDarkCyan, fontSize: 21, fontWeight: FontWeight.w800,
-        )),
+    return InkWell(
+      onTap: _signOut,
+      customBorder: const CircleBorder(),
+      child: Container(
+        width: 68, height: 68,
+        decoration: BoxDecoration(
+          color: Colors.white, shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: .8), width: 3),
+          boxShadow: [BoxShadow(
+            color: Colors.black.withValues(alpha: .12), blurRadius: 12, offset: const Offset(0, 5),
+          )],
+        ),
+        child: CircleAvatar(
+          backgroundColor: kLightCyan,
+          child: Text(_getInitials(_physioName), style: const TextStyle(
+            color: kDarkCyan, fontSize: 21, fontWeight: FontWeight.w800,
+          )),
+        ),
       ),
     );
   }
@@ -529,7 +570,7 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: patients.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        separatorBuilder: (context, index) => const SizedBox(width: 10),
         itemBuilder: (_, i) {
           final patient = patients[i];
           final improving = i.isEven;
