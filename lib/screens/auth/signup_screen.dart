@@ -313,7 +313,7 @@ class _SignupScreenState extends State<SignupScreen> {
           mainAxisSpacing: 9,
           crossAxisSpacing: 9,
         ),
-        itemBuilder: (_, __) {
+        itemBuilder: (context, index) {
           return Container(
             decoration: const BoxDecoration(
               color: Color(0xFFB9E7E7),

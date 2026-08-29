@@ -14,10 +14,54 @@ import 'patient_progress_screen.dart';
 import 'patient_records_screen.dart';
 import 'patient_settings_screen.dart';
 
-class PatientSideDrawer extends StatelessWidget {
-  const PatientSideDrawer({super.key, this.patientName = 'Anshu Reddy'});
+class PatientSideDrawer extends StatefulWidget {
+  const PatientSideDrawer({super.key, this.patientName, this.onSelectSection});
 
-  final String patientName;
+  final String? patientName;
+  final void Function(int sectionIndex)? onSelectSection;
+
+  @override
+  State<PatientSideDrawer> createState() => _PatientSideDrawerState();
+}
+
+class _PatientSideDrawerState extends State<PatientSideDrawer> {
+  String _displayName = 'Patient';
+  String _email = '';
+  String _initials = 'P';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    if (widget.patientName != null && widget.patientName!.isNotEmpty) {
+      _displayName = widget.patientName!;
+      _initials = _getInitials(_displayName);
+    }
+    try {
+      final user = await AuthService().getProfile();
+      if (!mounted) return;
+      setState(() {
+        if (user.fullName.isNotEmpty) {
+          _displayName = user.fullName;
+          _initials = _getInitials(user.fullName);
+        }
+        _email = user.email;
+      });
+    } catch (_) {}
+  }
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.isNotEmpty && parts[0].isNotEmpty) {
+      return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+    }
+    return 'P';
+  }
 
   Future<void> _logout(BuildContext context) async {
     final shouldLogout = await showDialog<bool>(
@@ -49,6 +93,17 @@ class PatientSideDrawer extends StatelessWidget {
     }
   }
 
+  void _handleSection(int index, Widget fallbackScreen) {
+    Navigator.of(context).pop();
+    if (widget.onSelectSection != null) {
+      widget.onSelectSection!(index);
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => fallbackScreen),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Drawer(
@@ -65,9 +120,9 @@ class PatientSideDrawer extends StatelessWidget {
                 CircleAvatar(
                   radius: 26,
                   backgroundColor: PatientTheme.primaryTeal,
-                  child: const Text(
-                    'AR',
-                    style: TextStyle(
+                  child: Text(
+                    _initials,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -80,7 +135,7 @@ class PatientSideDrawer extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        patientName,
+                        _displayName,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -88,9 +143,9 @@ class PatientSideDrawer extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      const Text(
-                        'anshu@gmail.com',
-                        style: TextStyle(
+                      Text(
+                        _email.isNotEmpty ? _email : 'patient@rehabz.com',
+                        style: const TextStyle(
                           fontSize: 12,
                           color: PatientTheme.textSecondary,
                         ),
@@ -110,52 +165,49 @@ class PatientSideDrawer extends StatelessWidget {
                 _buildDrawerItem(
                   context,
                   icon: Icons.home_rounded,
-                  title: 'Home Dashboard',
-                  onTap: () => Navigator.of(context).pop(),
-                ),
-                _buildDrawerItem(
-                  context,
-                  icon: Icons.assignment_outlined,
-                  title: 'My Programs',
+                  title: 'Home Overview',
                   onTap: () {
                     Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const PatientProgramsScreen()),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  context,
-                  icon: Icons.fitness_center_rounded,
-                  title: 'Today\'s Exercises',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ExerciseListScreen()),
-                    );
+                    if (widget.onSelectSection != null) {
+                      widget.onSelectSection!(0);
+                    }
                   },
                 ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.calendar_today_rounded,
                   title: 'My Appointments',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const PatientAppointmentsScreen()),
-                    );
-                  },
+                  onTap: () => _handleSection(1, const PatientAppointmentsScreen()),
+                ),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.fitness_center_rounded,
+                  title: 'Today\'s Exercises',
+                  onTap: () => _handleSection(2, const ExerciseListScreen()),
                 ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.trending_up_rounded,
                   title: 'Progress Tracking',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const PatientProgressScreen()),
-                    );
-                  },
+                  onTap: () => _handleSection(3, const PatientProgressScreen()),
+                ),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.description_outlined,
+                  title: 'Documents & Reports',
+                  onTap: () => _handleSection(4, const PatientDocumentsScreen()),
+                ),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.chat_bubble_outline_rounded,
+                  title: 'Messages',
+                  onTap: () => _handleSection(5, const PatientMessagesScreen()),
+                ),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.assignment_outlined,
+                  title: 'My Programs',
+                  onTap: () => _handleSection(6, const PatientProgramsScreen()),
                 ),
                 _buildDrawerItem(
                   context,
@@ -165,28 +217,6 @@ class PatientSideDrawer extends StatelessWidget {
                     Navigator.of(context).pop();
                     Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const PatientRecordsScreen()),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  context,
-                  icon: Icons.description_outlined,
-                  title: 'Documents & Reports',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const PatientDocumentsScreen()),
-                    );
-                  },
-                ),
-                _buildDrawerItem(
-                  context,
-                  icon: Icons.chat_bubble_outline_rounded,
-                  title: 'Messages',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const PatientMessagesScreen()),
                     );
                   },
                 ),

@@ -240,11 +240,11 @@ class _LoginScreenState extends State<LoginScreen>
       margin: const EdgeInsets.symmetric(vertical: 25),
       padding: const EdgeInsets.all(34),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.78),
+        color: Colors.white.withValues(alpha: .78),
         borderRadius: BorderRadius.circular(34),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(.06),
+            color: Colors.black.withValues(alpha: .06),
             blurRadius: 35,
             offset: const Offset(0, 18),
           ),
@@ -468,7 +468,7 @@ class _LoginScreenState extends State<LoginScreen>
                 onPressed: _isSigningIn ? null : _signIn,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _primary,
-                  disabledBackgroundColor: _primary.withOpacity(.55),
+                  disabledBackgroundColor: _primary.withValues(alpha: .55),
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -513,7 +513,7 @@ class _LoginScreenState extends State<LoginScreen>
               children: [
                 Expanded(
                   child: Divider(
-                    color: const Color(0xFFB9C9D5).withOpacity(.7),
+                    color: const Color(0xFFB9C9D5).withValues(alpha: .7),
                   ),
                 ),
                 const Padding(
@@ -528,7 +528,7 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
                 Expanded(
                   child: Divider(
-                    color: const Color(0xFFB9C9D5).withOpacity(.7),
+                    color: const Color(0xFFB9C9D5).withValues(alpha: .7),
                   ),
                 ),
               ],
@@ -678,7 +678,7 @@ class _LoginScreenState extends State<LoginScreen>
           width: 37,
           height: 37,
           decoration: BoxDecoration(
-            color: _primary.withOpacity(.10),
+            color: _primary.withValues(alpha: .10),
             borderRadius: BorderRadius.circular(11),
           ),
           child: Icon(

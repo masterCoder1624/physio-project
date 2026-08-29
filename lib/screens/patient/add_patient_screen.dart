@@ -27,16 +27,16 @@ class AddPatientScreen extends StatefulWidget {
 class _AddPatientScreenState extends State<AddPatientScreen> {
   int _currentStep = 1; // 1: Details, 2: Payments, 3: Success
 
-  // Form Controllers & State for Step 1
+  // Form Controllers & State for Step 1 — Clean, empty initialization
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController(text: 'Vikram Singh Nagar');
-  final _addressController = TextEditingController(text: 'JAIPUR');
-  final _phoneController = TextEditingController(text: '8739874457');
-  final _notesController = TextEditingController(
-    text: 'Prior ACL surgery 2 years ago. Recent pain flare up after jogging.',
-  );
-  String _selectedGender = 'Male';
-  String _selectedReason = 'Knee Rehabilitation';
+  final _nameController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _notesController = TextEditingController();
+  String? _selectedGender;
+  String? _selectedReason;
+  bool _genderError = false;
+  bool _reasonError = false;
 
   final List<String> _visitReasons = [
     'Knee Rehabilitation',
@@ -44,16 +44,19 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     'Post-Surgery Recovery',
     'Shoulder Impingement',
     'Cervical Spondylosis',
+    'Ankle Sprain / Fracture',
+    'Sports Injury Rehab',
+    'General Physiotherapy',
   ];
 
-  // State for Step 2 (Custom Amount Billing Inputs)
+  // State for Step 2 (Billing Inputs)
   String _paymentMode = 'Offline Payment';
-  final _descriptionController = TextEditingController(text: 'Treatment Session');
-  final _totalAmountController = TextEditingController(text: '1000');
-  final _paidAmountController = TextEditingController(text: '800');
+  final _descriptionController = TextEditingController();
+  final _totalAmountController = TextEditingController();
+  final _paidAmountController = TextEditingController();
 
-  double get _totalAmount => double.tryParse(_totalAmountController.text) ?? 1000.0;
-  double get _paidAmount => double.tryParse(_paidAmountController.text) ?? 800.0;
+  double get _totalAmount => double.tryParse(_totalAmountController.text.trim()) ?? 0.0;
+  double get _paidAmount => double.tryParse(_paidAmountController.text.trim()) ?? 0.0;
   double get _remainingAmount => (_totalAmount - _paidAmount) < 0 ? 0.0 : (_totalAmount - _paidAmount);
 
   bool _isSubmitting = false;
@@ -84,7 +87,16 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
   }
 
   void _nextToBilling() {
-    if (_formKey.currentState?.validate() ?? false) {
+    final formValid = _formKey.currentState?.validate() ?? false;
+    setState(() {
+      _genderError = _selectedGender == null;
+      _reasonError = _selectedReason == null;
+    });
+
+    if (formValid && !_genderError && !_reasonError) {
+      if (_descriptionController.text.trim().isEmpty) {
+        _descriptionController.text = 'Treatment Session';
+      }
       setState(() {
         _currentStep = 2;
       });
@@ -99,8 +111,10 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     final fileNo = 'FILE000${DateTime.now().millisecondsSinceEpoch % 10000}';
     final receiptNo = 'REC-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch % 10000}';
     final dateStr = '${DateTime.now().day.toString().padLeft(2, '0')}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().year}';
-    final patientName = _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Vikram Singh Nagar';
-    final description = _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : 'Treatment Session';
+    final patientName = _nameController.text.trim();
+    final description = _descriptionController.text.trim().isNotEmpty
+        ? _descriptionController.text.trim()
+        : 'Treatment Session';
 
     final initialBill = BillRecordModel(
       id: 'BILL_${DateTime.now().millisecondsSinceEpoch}',
@@ -112,32 +126,32 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       paidAmount: _paidAmount,
       remainingAmount: _remainingAmount,
       paymentMode: _paymentMode,
-      status: 'COMPLETED',
+      status: _remainingAmount == 0 ? 'COMPLETED' : 'PENDING',
     );
 
     try {
       await PatientService().createPatient(
         name: patientName,
-        condition: _selectedReason,
+        condition: _selectedReason ?? 'General Physiotherapy',
         gender: _selectedGender,
         phone: _phoneController.text.trim(),
-        city: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : 'JAIPUR',
+        city: _addressController.text.trim(),
         initialNotes: _notesController.text.trim(),
         initialBill: initialBill,
       );
     } catch (_) {
-      // Demo fallback if backend offline
+      // Handled cleanly
     }
 
-    // Pre-generate PDF receipt for downloading
+    // Pre-generate PDF receipt for downloading with actual data
     final pdfData = await PdfInvoiceService.generatePdfInvoice(
       fileNo: fileNo,
       patientName: patientName,
-      gender: _selectedGender == 'Female' ? 'F' : 'M',
-      age: '25',
-      contactNo: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : '8739874457',
+      gender: _selectedGender == 'Female' ? 'F' : (_selectedGender == 'Male' ? 'M' : 'O'),
+      age: '',
+      contactNo: _phoneController.text.trim(),
       dateStr: dateStr,
-      city: _addressController.text.trim().isNotEmpty ? _addressController.text.trim().toUpperCase() : 'JAIPUR',
+      city: _addressController.text.trim().toUpperCase(),
       receiptNo: receiptNo,
       description: description,
       amount: _totalAmount,
@@ -157,9 +171,10 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     if (_pdfBytes == null) return;
     setState(() => _isGeneratingPdf = true);
     try {
+      final safeName = _nameController.text.trim().replaceAll(RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
       await PdfInvoiceService.downloadOrPrintInvoice(
         _pdfBytes!,
-        'Patient_Bill_${_nameController.text.trim().replaceAll(' ', '_')}.pdf',
+        'Patient_Bill_${safeName.isEmpty ? "Receipt" : safeName}.pdf',
       );
     } catch (e) {
       if (!mounted) return;
@@ -180,20 +195,26 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       _addressController.text = '';
       _phoneController.text = '';
       _notesController.text = '';
-      _descriptionController.text = 'Treatment Session';
-      _totalAmountController.text = '1000';
-      _paidAmountController.text = '800';
-      _selectedGender = 'Male';
-      _selectedReason = 'Knee Rehabilitation';
+      _descriptionController.text = '';
+      _totalAmountController.text = '';
+      _paidAmountController.text = '';
+      _selectedGender = null;
+      _selectedReason = null;
+      _genderError = false;
+      _reasonError = false;
       _pdfBytes = null;
     });
   }
 
   void _goToDashboard() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const PhysioDashboard()),
-      (route) => false,
-    );
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(true);
+    } else {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const PhysioDashboard()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -244,7 +265,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
         Expanded(
           child: SingleChildScrollView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
             child: Form(
               key: _formKey,
               child: Column(
@@ -253,11 +274,9 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                   _buildSectionIntro(
                     icon: Icons.person_outline_rounded,
                     title: 'Patient Information',
-                    subtitle: "Let's add some basic information",
+                    subtitle: 'Enter basic information for the new patient',
                   ),
-                  const SizedBox(height: 16),
-                  _buildPhotoUploadCard(),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 20),
 
                   _buildLabel('Full Name', required: true, icon: Icons.person_outline_rounded),
                   const SizedBox(height: 7),
@@ -281,6 +300,13 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                       _buildGenderPill('Other'),
                     ],
                   ),
+                  if (_genderError) ...[
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Please select a gender',
+                      style: TextStyle(color: _kDanger, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ],
                   const SizedBox(height: 18),
 
                   _buildLabel('Contact Number', icon: Icons.phone_outlined),
@@ -305,13 +331,20 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                   _buildSectionIntro(
                     icon: Icons.medical_services_outlined,
                     title: 'Treatment Information',
-                    subtitle: 'Share the reason for visit and notes',
+                    subtitle: 'Select reason for visit and clinical notes',
                   ),
                   const SizedBox(height: 16),
 
                   _buildLabel('Reason for Visit', required: true, icon: Icons.healing_outlined),
                   const SizedBox(height: 7),
                   _buildReasonDropdown(),
+                  if (_reasonError) ...[
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Please select reason for visit',
+                      style: TextStyle(color: _kDanger, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ],
                   const SizedBox(height: 18),
 
                   Row(
@@ -404,20 +437,20 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                   subtitle: 'Enter the amount received today',
                 ),
                 const SizedBox(height: 14),
-                _buildLabel('Total Amount (Rs.)', required: true, icon: Icons.currency_rupee_rounded),
+                _buildLabel('Total Amount (₹)', required: true, icon: Icons.currency_rupee_rounded),
                 const SizedBox(height: 7),
                 _buildTextField(
                   controller: _totalAmountController,
-                  hint: 'Enter total amount',
+                  hint: '0',
                   prefixIcon: Icons.currency_rupee_rounded,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 ),
                 const SizedBox(height: 16),
-                _buildLabel('Paid Today (Rs.)', required: true, icon: Icons.payments_outlined),
+                _buildLabel('Paid Today (₹)', required: true, icon: Icons.payments_outlined),
                 const SizedBox(height: 7),
                 _buildTextField(
                   controller: _paidAmountController,
-                  hint: 'Enter amount paid today',
+                  hint: '0',
                   prefixIcon: Icons.payments_outlined,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 ),
@@ -449,7 +482,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
           title: 'Patient Added',
           subtitle: 'Registration complete',
           stepDots: 3,
-          onBack: () => _resetForm(),
+          onBack: () => _goToDashboard(),
         ),
         Expanded(
           child: SingleChildScrollView(
@@ -470,7 +503,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                 const Text(
                   'Patient Added Successfully!',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800, color: _kTextPrimary, letterSpacing: -0.5),
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: _kTextPrimary, letterSpacing: -0.5),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -537,7 +570,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
   }
 
   // ==========================================
-  // UI helpers only — backend/state methods above are unchanged.
+  // UI Helpers
   // ==========================================
 
   Widget _buildHeader({
@@ -618,40 +651,6 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     );
   }
 
-  Widget _buildPhotoUploadCard() {
-    return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _kBorder),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(color: const Color(0xFFEAF8FA), shape: BoxShape.circle),
-              child: const Icon(Icons.camera_alt_outlined, color: _kMint, size: 25),
-            ),
-            const SizedBox(width: 14),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Add patient photo', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: _kTextPrimary)),
-                  SizedBox(height: 4),
-                  Text('Optional • Helps identify the patient quickly', style: TextStyle(fontSize: 11, color: _kTextSecondary, height: 1.3)),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: _kTextMuted),
-          ],
-        ),
-    );
-  }
-
   Widget _buildLabel(String label, {bool required = false, IconData? icon}) {
     return Row(
       children: [
@@ -709,17 +708,27 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
   Widget _buildReasonDropdown() {
     return Container(
       padding: const EdgeInsets.only(left: 14, right: 8),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13), border: Border.all(color: _kBorder)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: _reasonError ? _kDanger : _kBorder),
+      ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _selectedReason,
+          hint: const Text('Select reason for visit / condition', style: TextStyle(color: _kTextMuted, fontSize: 13)),
           dropdownColor: Colors.white,
           icon: const Icon(Icons.keyboard_arrow_down_rounded, color: _kTextSecondary),
           isExpanded: true,
           style: const TextStyle(color: _kTextPrimary, fontSize: 14, fontWeight: FontWeight.w600),
-          items: _visitReasons.map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis))).toList(),
+          items: _visitReasons
+              .map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis)))
+              .toList(),
           onChanged: (val) {
-            if (val != null) setState(() => _selectedReason = val);
+            setState(() {
+              _selectedReason = val;
+              _reasonError = false;
+            });
           },
         ),
       ),
@@ -733,7 +742,10 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(13),
-          onTap: () => setState(() => _selectedGender = gender),
+          onTap: () => setState(() {
+            _selectedGender = gender;
+            _genderError = false;
+          }),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -741,14 +753,29 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
             decoration: BoxDecoration(
               color: isSelected ? _kMint : Colors.white,
               borderRadius: BorderRadius.circular(13),
-              border: Border.all(color: isSelected ? _kMint : _kBorder),
+              border: Border.all(
+                color: isSelected
+                    ? _kMint
+                    : (_genderError ? _kDanger : _kBorder),
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.person_outline_rounded, size: 17, color: isSelected ? Colors.white : _kTextSecondary),
+                Icon(
+                  Icons.person_outline_rounded,
+                  size: 17,
+                  color: isSelected ? Colors.white : _kTextSecondary,
+                ),
                 const SizedBox(width: 5),
-                Text(gender, style: TextStyle(fontSize: 12.5, fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600, color: isSelected ? Colors.white : _kTextPrimary)),
+                Text(
+                  gender,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                    color: isSelected ? Colors.white : _kTextPrimary,
+                  ),
+                ),
               ],
             ),
           ),
@@ -827,15 +854,15 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          _buildInvoiceRow(_descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : 'Treatment Session', 'Rs. ${_totalAmount.toStringAsFixed(0)}'),
+          _buildInvoiceRow(_descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : 'Treatment Session', '₹ ${_totalAmount.toStringAsFixed(0)}'),
           const SizedBox(height: 8),
-          _buildInvoiceRow('Paid Today', 'Rs. ${_paidAmount.toStringAsFixed(0)}'),
+          _buildInvoiceRow('Paid Today', '₹ ${_paidAmount.toStringAsFixed(0)}'),
           const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(color: _kBorder, height: 1)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Remaining Due', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kTextPrimary)),
-              Text('Rs. ${_remainingAmount.toStringAsFixed(0)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: fullyPaid ? _kSuccess : _kDanger)),
+              Text('₹ ${_remainingAmount.toStringAsFixed(0)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: fullyPaid ? _kSuccess : _kDanger)),
             ],
           ),
         ],
@@ -853,7 +880,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
           CircleAvatar(
             radius: 28,
             backgroundColor: const Color(0xFFE8F8FA),
-            child: Text(patientName.substring(0, 1).toUpperCase(), style: const TextStyle(color: _kMint, fontSize: 20, fontWeight: FontWeight.w800)),
+            child: Text(patientName.isNotEmpty ? patientName.substring(0, 1).toUpperCase() : 'P', style: const TextStyle(color: _kMint, fontSize: 20, fontWeight: FontWeight.w800)),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -862,7 +889,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
               children: [
                 Text(patientName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _kTextPrimary)),
                 const SizedBox(height: 4),
-                Text(_selectedReason, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: _kTextSecondary)),
+                Text(_selectedReason ?? 'General Physiotherapy', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: _kTextSecondary)),
                 const SizedBox(height: 3),
                 Text(_phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : 'No phone number', style: const TextStyle(fontSize: 11, color: _kTextMuted)),
               ],
@@ -881,13 +908,13 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _kBorder)),
       child: Column(
         children: [
-          _buildInvoiceRow('Total Amount', 'Rs. ${_totalAmount.toStringAsFixed(0)}'),
+          _buildInvoiceRow('Total Amount', '₹ ${_totalAmount.toStringAsFixed(0)}'),
           const SizedBox(height: 12),
-          _buildInvoiceRow('Paid Today', 'Rs. ${_paidAmount.toStringAsFixed(0)}'),
+          _buildInvoiceRow('Paid Today', '₹ ${_paidAmount.toStringAsFixed(0)}'),
           const SizedBox(height: 12),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             const Text('Remaining Due', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kTextPrimary)),
-            Text('Rs. ${_remainingAmount.toStringAsFixed(0)}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: fullyPaid ? _kSuccess : _kDanger)),
+            Text('₹ ${_remainingAmount.toStringAsFixed(0)}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: fullyPaid ? _kSuccess : _kDanger)),
           ]),
         ],
       ),
@@ -927,5 +954,4 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       ],
     );
   }
-
 }
