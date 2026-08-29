@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Grants access to application internal cache (where APK is downloaded) -->
+    <cache-path name="cache" path="." />
+    <!-- Grants access to application external cache -->
+    <external-cache-path name="external_cache" path="." />
+    <!-- Grants access to application internal files -->
+    <files-path name="files" path="." />
+    <!-- Grants access to application external files -->
+    <external-files-path name="external_files" path="." />
+    <!-- Grants access to root external storage if applicable -->
+    <external-path name="external_storage" path="." />
+</paths>

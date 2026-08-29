@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../../services/update_service.dart';
 import '../auth/login_screen.dart';
 import 'calendar_screen.dart';
 import 'patient_list_screen.dart';
@@ -406,6 +407,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           _setting(Icons.settings_outlined, 'Account Settings', () => _message('Account settings')),
           _setting(Icons.notifications_none_outlined, 'Notifications', () => _message('Notifications')),
+          _setting(Icons.system_update_rounded, 'Check for Updates', () => UpdateService.instance.checkAndPromptUpdate(context, isManual: true)),
           _setting(Icons.help_outline, 'Help & Support', () => _message('Help & Support')),
           _setting(Icons.shield_outlined, 'Privacy & Security', () => _message('Privacy & Security')),
         ],

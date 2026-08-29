@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/auth_service.dart';
+import '../../services/update_service.dart';
 import '../patient/add_patient_screen.dart';
 import '../patient/patient_dashboard.dart';
 import 'signup_screen.dart';
@@ -37,6 +38,13 @@ class _LoginScreenState extends State<LoginScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     )..forward();
+
+    // Check for APK updates in background without blocking UI
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        UpdateService.instance.checkAndPromptUpdate(context, isManual: false);
+      }
+    });
   }
 
   @override

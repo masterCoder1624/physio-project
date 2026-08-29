@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../constants/patient_theme.dart';
+import '../../services/update_service.dart';
 import 'patient_components.dart';
 import 'patient_edit_profile_screen.dart';
 
@@ -132,6 +133,41 @@ class _PatientSettingsScreenState extends State<PatientSettingsScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 20),
+
+          // App Updates & Version
+          _buildSectionHeader('About & Updates'),
+          PatientCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                _buildActionTile(
+                  icon: Icons.system_update_rounded,
+                  title: 'Check for Updates',
+                  trailingText: 'GitHub Releases',
+                  onTap: () {
+                    UpdateService.instance.checkAndPromptUpdate(context, isManual: true);
+                  },
+                ),
+                const Divider(height: 1, color: PatientTheme.border),
+                FutureBuilder<String>(
+                  future: UpdateService.instance.getCurrentVersion(),
+                  builder: (context, snapshot) {
+                    final version = snapshot.data ?? '1.0.0';
+                    return _buildActionTile(
+                      icon: Icons.info_outline_rounded,
+                      title: 'App Version',
+                      trailingText: 'v$version',
+                      onTap: () {
+                        UpdateService.instance.checkAndPromptUpdate(context, isManual: true);
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
         ],
       ),
     );

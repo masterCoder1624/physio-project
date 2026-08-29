@@ -414,7 +414,6 @@ class _OverviewTabViewState extends State<_OverviewTabView>
   PatientProgramModel? _activeProgram;
   PatientProgressModel? _progressData;
   int _unreadMessages = 0;
-  bool _isLoading = false;
 
   @override
   void initState() {
