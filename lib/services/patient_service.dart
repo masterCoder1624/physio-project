@@ -120,399 +120,11 @@ class PatientService {
     ),
   ];
 
-  // In-memory patient store populated with full V1 clinical test data
-  final List<PatientModel> _localPatientsStore = [
-    PatientModel(
-      id: '1',
-      name: 'Ananya Sharma',
-      condition: 'Knee Injury Rehabilitation',
-      gender: 'female',
-      age: '29',
-      city: 'Jaipur',
-      phone: '+91 98765 43210',
-      status: 'ACTIVE',
-      createdAt: '2026-07-01',
-      assessment: const AssessmentModel(
-        id: 'ASS_001',
-        date: '2026-07-02',
-        chiefComplaint: 'Right knee pain post-twisting injury, swelling with weight bearing.',
-        painLevel: 6,
-        painType: 'Throbbing / Aching',
-        activeRomFlexion: '105°',
-        activeRomExtension: '0°',
-        passiveRom: '115°',
-        muscleStrengthMMT: '3+/5 (Fair+)',
-        functionalLimitations: 'Difficulty negotiating stairs and sustained squatting.',
-        postureGaitNotes: 'Antalgic gait favoring right lower extremity.',
-        clinicalGoal: 'Achieve 130° flexion, pain score <= 2/10, resume light jogging in 6 weeks.',
-      ),
-      treatmentPrograms: [
-        TreatmentProgramModel(
-          id: 'PRG_001',
-          title: 'Post-Injury Knee Recovery Protocol',
-          diagnosis: 'Right Knee Medial Meniscal Strain & Patellar Tendinopathy',
-          primaryGoal: 'Restore full pain-free ROM and quad strength',
-          durationWeeks: 6,
-          totalSessionsTarget: 12,
-          completedSessionsCount: 4,
-          startDate: '2026-07-03',
-          status: 'ACTIVE',
-          assignedExercises: const [
-            AssignedExercise(
-              id: 'ASG_001',
-              exerciseId: 'ex-1',
-              title: 'Quadriceps Setting (Quad Sets)',
-              bodyPart: 'Knee',
-              difficulty: 'Beginner',
-              instructions: 'Press knee downwards into towel roll. Hold for 5 seconds.',
-              sets: 3,
-              reps: 10,
-              holdSeconds: 5,
-              frequencyPerDay: 2,
-              isCompleted: true,
-            ),
-            AssignedExercise(
-              id: 'ASG_002',
-              exerciseId: 'ex-2',
-              title: 'Straight Leg Raise (SLR)',
-              bodyPart: 'Knee & Hip',
-              difficulty: 'Beginner',
-              instructions: 'Keep leg straight and lift 45 degrees. Lower slowly.',
-              sets: 3,
-              reps: 12,
-              holdSeconds: 3,
-              frequencyPerDay: 2,
-              isCompleted: true,
-            ),
-            AssignedExercise(
-              id: 'ASG_003',
-              exerciseId: 'ex-3',
-              title: 'Heel Slides with Towel',
-              bodyPart: 'Knee',
-              difficulty: 'Beginner',
-              instructions: 'Slide heel towards buttocks to tolerance. Hold 3 seconds.',
-              sets: 3,
-              reps: 10,
-              holdSeconds: 3,
-              frequencyPerDay: 2,
-              isCompleted: false,
-            ),
-          ],
-        ),
-      ],
-      sessionNotes: const [
-        SessionNoteModel(
-          id: 'NOTE_001',
-          sessionNumber: 1,
-          date: '2026-07-03',
-          painLevel: 6,
-          subjectiveNotes: 'Patient reports moderate aching in medial knee after walking 15 mins.',
-          objectiveFindings: 'Mild effusion, tenderness over medial joint line. Flexion 105°.',
-          treatmentRendered: 'Cryotherapy, gentle passive mobilization Grade II, isometric quad activation.',
-          planForNextSession: 'Progress to active-assisted heel slides and SLR with 1kg cuff weight.',
-        ),
-        SessionNoteModel(
-          id: 'NOTE_002',
-          sessionNumber: 2,
-          date: '2026-07-10',
-          painLevel: 4,
-          subjectiveNotes: 'Effusion decreased significantly. Walking feels more stable.',
-          objectiveFindings: 'Flexion improved to 115°. Extension full at 0°. No resting pain.',
-          treatmentRendered: 'Ultrasound therapy 1.5W/cm2, patellar taping, closed chain mini-squats.',
-          planForNextSession: 'Introduce resistance band hamstring curls and step-downs.',
-        ),
-      ],
-      bills: const [
-        BillRecordModel(
-          id: 'BILL_001',
-          fileNo: 'FILE0001',
-          receiptNo: 'REC-2026-001',
-          dateStr: '03-07-2026',
-          description: 'Initial Evaluation & Treatment Session',
-          amount: 1200,
-          paidAmount: 1200,
-          remainingAmount: 0,
-          paymentMode: 'UPI / Online',
-          status: 'COMPLETED',
-        ),
-        BillRecordModel(
-          id: 'BILL_002',
-          fileNo: 'FILE0001',
-          receiptNo: 'REC-2026-015',
-          dateStr: '10-07-2026',
-          description: 'Rehabilitation Session 2 + Taping',
-          amount: 800,
-          paidAmount: 800,
-          remainingAmount: 0,
-          paymentMode: 'Offline Cash',
-          status: 'COMPLETED',
-        ),
-      ],
-      documents: const [
-        PatientDocumentModel(
-          id: 'DOC_001',
-          title: 'Right Knee MRI Report',
-          category: 'Imaging',
-          uploadDate: '2026-07-02',
-          fileSize: '2.4 MB',
-          fileExtension: 'PDF',
-          notes: 'Grade 1 medial meniscus tear, no ligament rupture.',
-        ),
-        PatientDocumentModel(
-          id: 'DOC_002',
-          title: 'Orthopedic Referral Prescription',
-          category: 'Referral',
-          uploadDate: '2026-07-02',
-          fileSize: '850 KB',
-          fileExtension: 'PDF',
-        ),
-      ],
-    ),
-    PatientModel(
-      id: '2',
-      name: 'Rahul Mehta',
-      condition: 'Lower Back Pain',
-      gender: 'male',
-      age: '34',
-      city: 'Jaipur',
-      phone: '+91 87654 32109',
-      status: 'ACTIVE',
-      createdAt: '2026-07-15',
-      assessment: const AssessmentModel(
-        id: 'ASS_002',
-        date: '2026-07-15',
-        chiefComplaint: 'Lumbar pain radiating to left gluteal region exacerbated by sitting >30 mins.',
-        painLevel: 5,
-        painType: 'Dull / Aching with occasional stabbing',
-        activeRomFlexion: 'Fingertips to mid-shin (approx 50°)',
-        activeRomExtension: '10° with mild discomfort',
-        passiveRom: 'Normal hip range',
-        muscleStrengthMMT: '4/5',
-        functionalLimitations: 'Prolonged desk work causes stiffness; difficulty lifting heavy objects.',
-        clinicalGoal: 'Full lumbar extension without pain, sit comfortably for 90 mins.',
-      ),
-      treatmentPrograms: [
-        TreatmentProgramModel(
-          id: 'PRG_002',
-          title: 'Lumbar Core Stabilization & Decompression',
-          diagnosis: 'L4-L5 Disc Bulge with Mechanical Low Back Pain',
-          primaryGoal: 'Strengthen core stabilizers and relieve neural tension',
-          durationWeeks: 4,
-          totalSessionsTarget: 8,
-          completedSessionsCount: 2,
-          startDate: '2026-07-16',
-          status: 'ACTIVE',
-          assignedExercises: const [
-            AssignedExercise(
-              id: 'ASG_004',
-              exerciseId: 'ex-4',
-              title: 'Cat-Cow Spinal Mobilization',
-              bodyPart: 'Spine & Back',
-              difficulty: 'Beginner',
-              instructions: 'Perform gentle spinal flexion and extension with breathing.',
-              sets: 3,
-              reps: 10,
-              holdSeconds: 3,
-              frequencyPerDay: 2,
-            ),
-            AssignedExercise(
-              id: 'ASG_005',
-              exerciseId: 'ex-5',
-              title: 'Bridging (Glute Bridge)',
-              bodyPart: 'Spine & Hip',
-              difficulty: 'Intermediate',
-              instructions: 'Squeeze glutes and lift hips. Hold 5 seconds at top.',
-              sets: 3,
-              reps: 12,
-              holdSeconds: 5,
-              frequencyPerDay: 2,
-            ),
-          ],
-        ),
-      ],
-      bills: const [
-        BillRecordModel(
-          id: 'BILL_003',
-          fileNo: 'FILE0002',
-          receiptNo: 'REC-2026-022',
-          dateStr: '15-07-2026',
-          description: 'Consultation & Spinal Traction Session',
-          amount: 1000,
-          paidAmount: 800,
-          remainingAmount: 200,
-          paymentMode: 'Offline Cash',
-          status: 'COMPLETED',
-        ),
-      ],
-    ),
-    PatientModel(
-      id: '3',
-      name: 'Priya Patel',
-      condition: 'Shoulder Impingement',
-      gender: 'female',
-      age: '42',
-      city: 'Jaipur',
-      phone: '+91 76543 21098',
-      status: 'ACTIVE',
-      createdAt: '2026-07-10',
-      assessment: const AssessmentModel(
-        id: 'ASS_003',
-        date: '2026-07-10',
-        chiefComplaint: 'Right shoulder pain when reaching overhead or behind back.',
-        painLevel: 5,
-        painType: 'Sharp on abduction >90°',
-        activeRomFlexion: '130°',
-        activeRomExtension: '35°',
-        passiveRom: '145°',
-        muscleStrengthMMT: '4-/5 for external rotators',
-        functionalLimitations: 'Difficulty fastening clothes and reaching top shelves.',
-      ),
-      treatmentPrograms: [
-        TreatmentProgramModel(
-          id: 'PRG_003',
-          title: 'Rotator Cuff & Scapular Rehab',
-          diagnosis: 'Subacromial Impingement & Supraspinatus Tendinopathy',
-          primaryGoal: 'Restore full overhead elevation without painful arc',
-          durationWeeks: 6,
-          totalSessionsTarget: 10,
-          completedSessionsCount: 3,
-          startDate: '2026-07-11',
-          status: 'ACTIVE',
-          assignedExercises: const [
-            AssignedExercise(
-              id: 'ASG_006',
-              exerciseId: 'ex-6',
-              title: 'Pendulum Exercises (Codman’s)',
-              bodyPart: 'Shoulder',
-              difficulty: 'Beginner',
-              instructions: 'Let affected arm dangle and move in smooth circles.',
-              sets: 3,
-              reps: 15,
-              holdSeconds: 0,
-              frequencyPerDay: 3,
-            ),
-            AssignedExercise(
-              id: 'ASG_007',
-              exerciseId: 'ex-7',
-              title: 'Scapular Retraction & Wall Slides',
-              bodyPart: 'Shoulder & Upper Back',
-              difficulty: 'Intermediate',
-              instructions: 'Slide forearms up wall maintaining scapular depression.',
-              sets: 3,
-              reps: 10,
-              holdSeconds: 3,
-              frequencyPerDay: 2,
-            ),
-          ],
-        ),
-      ],
-      bills: const [
-        BillRecordModel(
-          id: 'BILL_004',
-          fileNo: 'FILE0003',
-          receiptNo: 'REC-2026-031',
-          dateStr: '10-07-2026',
-          description: 'Evaluation & Manual Mobilization',
-          amount: 1000,
-          paidAmount: 1000,
-          remainingAmount: 0,
-          paymentMode: 'UPI / Online',
-          status: 'COMPLETED',
-        ),
-      ],
-    ),
-    PatientModel(
-      id: '4',
-      name: 'Vikram Singh Nagar',
-      condition: 'Post-ACL Surgery Rehab',
-      gender: 'male',
-      age: '25',
-      city: 'JAIPUR',
-      phone: '8739874457',
-      status: 'ACTIVE',
-      createdAt: '2026-07-20',
-      assessment: const AssessmentModel(
-        id: 'ASS_004',
-        date: '2026-07-20',
-        chiefComplaint: 'Post-operative stiffness and quadriceps atrophy 4 weeks post-ACL repair.',
-        painLevel: 3,
-        painType: 'Stiff / Mild aching on terminal extension',
-        activeRomFlexion: '115°',
-        activeRomExtension: '0°',
-        passiveRom: '120°',
-        muscleStrengthMMT: '4/5',
-        functionalLimitations: 'Unable to run or perform cutting maneuvers. Full weight bearing achieved.',
-        clinicalGoal: 'Return to competitive cricket in 6 months.',
-      ),
-      treatmentPrograms: [
-        TreatmentProgramModel(
-          id: 'PRG_004',
-          title: 'Post-Op ACL Phase 2 Protocol',
-          diagnosis: 'Right ACL Reconstruction (Hamstring Graft) - Week 4',
-          primaryGoal: 'Achieve 135° flexion, symmetric quad girth, and normal gait',
-          durationWeeks: 8,
-          totalSessionsTarget: 16,
-          completedSessionsCount: 4,
-          startDate: '2026-07-21',
-          status: 'ACTIVE',
-          assignedExercises: const [
-            AssignedExercise(
-              id: 'ASG_008',
-              exerciseId: 'ex-1',
-              title: 'Quadriceps Setting (Quad Sets)',
-              bodyPart: 'Knee',
-              difficulty: 'Beginner',
-              instructions: 'Press knee down into towel. Hold 5s. 3 sets of 10 reps.',
-              sets: 3,
-              reps: 10,
-              holdSeconds: 5,
-              frequencyPerDay: 2,
-              isCompleted: true,
-            ),
-            AssignedExercise(
-              id: 'ASG_009',
-              exerciseId: 'ex-2',
-              title: 'Straight Leg Raise (SLR)',
-              bodyPart: 'Knee & Hip',
-              difficulty: 'Intermediate',
-              instructions: 'Lift straight leg 45 degrees. 3 sets of 12 reps.',
-              sets: 3,
-              reps: 12,
-              holdSeconds: 3,
-              frequencyPerDay: 2,
-              isCompleted: false,
-            ),
-          ],
-        ),
-      ],
-      sessionNotes: const [
-        SessionNoteModel(
-          id: 'NOTE_003',
-          sessionNumber: 1,
-          date: '2026-07-21',
-          painLevel: 3,
-          subjectiveNotes: 'Patient doing well with crutch weaning. No graft site pain.',
-          objectiveFindings: 'Flexion 115°, extension full at 0°. Mild portal tenderness.',
-          treatmentRendered: 'Scar tissue massage, active ROM, stationary cycling with zero resistance.',
-          planForNextSession: 'Increase bike duration to 15 mins, introduce proprioception rocker board.',
-        ),
-      ],
-      bills: const [
-        BillRecordModel(
-          id: 'BILL_005',
-          fileNo: 'FILE0005',
-          receiptNo: 'FILE0005-1',
-          dateStr: '20-07-2026',
-          description: 'Treatment Session',
-          amount: 1000,
-          paidAmount: 800,
-          remainingAmount: 200,
-          paymentMode: 'Offline Payment',
-          status: 'COMPLETED',
-        ),
-      ],
-    ),
-  ];
+  final Map<String, PatientModel> _sessionPatients = {};
+
+  void clearSession() {
+    _sessionPatients.clear();
+  }
 
   Future<List<PatientModel>> getPatients({int page = 1, int size = 100}) async {
     try {
@@ -532,14 +144,15 @@ class PatientService {
         },
       );
 
-      if (response.success && response.data != null && response.data!.isNotEmpty) {
-        final existingIds = response.data!.map((p) => p.id).toSet();
-        final localExtras = _localPatientsStore.where((p) => !existingIds.contains(p.id));
-        return [...response.data!, ...localExtras];
+      if (response.success && response.data != null) {
+        for (final p in response.data!) {
+          if (p.id != null) _sessionPatients[p.id!] = p;
+        }
+        return response.data!;
       }
     } catch (_) {}
 
-    return List.from(_localPatientsStore);
+    return _sessionPatients.values.toList();
   }
 
   Future<PatientModel> getPatientById(String id) async {
@@ -551,21 +164,21 @@ class PatientService {
 
       if (response.success && response.data != null) {
         var patient = response.data!;
-        // Load latest clinical assessment and session notes from live backend
         final latestAssessment = await ClinicalService().getLatestAssessment(id);
         final notes = await ClinicalService().getNotes(id);
-        return patient.copyWith(
+        patient = patient.copyWith(
           assessment: latestAssessment ?? patient.assessment,
           sessionNotes: notes.isNotEmpty ? notes : patient.sessionNotes,
         );
+        _sessionPatients[id] = patient;
+        return patient;
       }
     } catch (_) {}
 
-    final match = _localPatientsStore.firstWhere(
-      (p) => p.id == id,
-      orElse: () => _localPatientsStore.first,
-    );
-    return match;
+    if (_sessionPatients.containsKey(id)) {
+      return _sessionPatients[id]!;
+    }
+    throw Exception('Patient not found');
   }
 
   Future<PatientModel> createPatient({
@@ -578,9 +191,9 @@ class PatientService {
     String? initialNotes,
     BillRecordModel? initialBill,
   }) async {
-    final newId = 'PAT_${DateTime.now().millisecondsSinceEpoch}';
-    final newPatient = PatientModel(
-      id: newId,
+    final localId = 'PAT_${DateTime.now().millisecondsSinceEpoch}';
+    final localPatient = PatientModel(
+      id: localId,
       name: name.trim(),
       condition: condition.trim(),
       gender: gender?.toLowerCase() ?? 'other',
@@ -640,24 +253,37 @@ class PatientService {
       bills: initialBill != null ? [initialBill] : [],
     );
 
-    _localPatientsStore.insert(0, newPatient);
-
     try {
-      await _apiClient.post<PatientModel>(
+      final response = await _apiClient.post<PatientModel>(
         '/patients',
         body: {
           'name': name.trim(),
           'full_name': name.trim(),
           'primary_condition': condition.trim(),
-          'gender': gender?.toLowerCase(),
+          'condition': condition.trim(),
+          'gender': gender?.toLowerCase() ?? 'other',
           'emergency_contact_phone': phone?.trim(),
+          'phone': phone?.trim(),
           'emergency_contact_name': name.trim(),
+          'medical_history': initialNotes,
         },
         fromJson: (json) => PatientModel.fromJson(json as Map<String, dynamic>),
       );
+
+      if (response.success && response.data != null) {
+        final serverPatient = response.data!;
+        final merged = serverPatient.copyWith(
+          assessment: localPatient.assessment,
+          treatmentPrograms: localPatient.treatmentPrograms,
+          bills: localPatient.bills,
+        );
+        _sessionPatients[merged.id ?? localId] = merged;
+        return merged;
+      }
     } catch (_) {}
 
-    return newPatient;
+    _sessionPatients[localId] = localPatient;
+    return localPatient;
   }
 
   /// Save or update clinical assessment for a patient (V1-05)
@@ -666,40 +292,37 @@ class PatientService {
       await ClinicalService().createAssessment(patientId, assessment);
     } catch (_) {}
 
-    final index = _localPatientsStore.indexWhere((p) => p.id == patientId);
-    if (index != -1) {
-      final updated = _localPatientsStore[index].copyWith(assessment: assessment);
-      _localPatientsStore[index] = updated;
+    if (_sessionPatients.containsKey(patientId)) {
+      _sessionPatients[patientId] = _sessionPatients[patientId]!.copyWith(assessment: assessment);
     }
   }
 
   /// Add or update a treatment program (V1-07)
   Future<void> saveTreatmentProgram(String patientId, TreatmentProgramModel program) async {
-    final index = _localPatientsStore.indexWhere((p) => p.id == patientId);
-    if (index != -1) {
-      final currentList = List<TreatmentProgramModel>.from(_localPatientsStore[index].treatmentPrograms);
+    if (_sessionPatients.containsKey(patientId)) {
+      final patient = _sessionPatients[patientId]!;
+      final currentList = List<TreatmentProgramModel>.from(patient.treatmentPrograms);
       final progIndex = currentList.indexWhere((prg) => prg.id == program.id);
       if (progIndex != -1) {
         currentList[progIndex] = program;
       } else {
         currentList.insert(0, program);
       }
-      _localPatientsStore[index] = _localPatientsStore[index].copyWith(treatmentPrograms: currentList);
+      _sessionPatients[patientId] = patient.copyWith(treatmentPrograms: currentList);
     }
   }
 
   /// Assign a new exercise to a patient's active program (V1-09)
   Future<void> assignExerciseToPatient(String patientId, AssignedExercise exercise) async {
-    final index = _localPatientsStore.indexWhere((p) => p.id == patientId);
-    if (index != -1) {
-      final patient = _localPatientsStore[index];
+    if (_sessionPatients.containsKey(patientId)) {
+      final patient = _sessionPatients[patientId]!;
       if (patient.treatmentPrograms.isNotEmpty) {
         final activeProgram = patient.treatmentPrograms.first;
         final updatedExercises = List<AssignedExercise>.from(activeProgram.assignedExercises)..add(exercise);
         final updatedProgram = activeProgram.copyWith(assignedExercises: updatedExercises);
         final updatedPrograms = List<TreatmentProgramModel>.from(patient.treatmentPrograms);
         updatedPrograms[0] = updatedProgram;
-        _localPatientsStore[index] = patient.copyWith(treatmentPrograms: updatedPrograms);
+        _sessionPatients[patientId] = patient.copyWith(treatmentPrograms: updatedPrograms);
       }
     }
   }
@@ -710,20 +333,19 @@ class PatientService {
       await ClinicalService().createNote(patientId, note);
     } catch (_) {}
 
-    final index = _localPatientsStore.indexWhere((p) => p.id == patientId);
-    if (index != -1) {
-      final currentNotes = List<SessionNoteModel>.from(_localPatientsStore[index].sessionNotes);
+    if (_sessionPatients.containsKey(patientId)) {
+      final patient = _sessionPatients[patientId]!;
+      final currentNotes = List<SessionNoteModel>.from(patient.sessionNotes);
       currentNotes.insert(0, note);
-      
-      // Also advance completed sessions count in active program
-      var programs = List<TreatmentProgramModel>.from(_localPatientsStore[index].treatmentPrograms);
+
+      var programs = List<TreatmentProgramModel>.from(patient.treatmentPrograms);
       if (programs.isNotEmpty) {
         programs[0] = programs[0].copyWith(
           completedSessionsCount: programs[0].completedSessionsCount + 1,
         );
       }
 
-      _localPatientsStore[index] = _localPatientsStore[index].copyWith(
+      _sessionPatients[patientId] = patient.copyWith(
         sessionNotes: currentNotes,
         treatmentPrograms: programs,
       );
@@ -732,29 +354,28 @@ class PatientService {
 
   /// Save generated bill into patient's Bill Vault (V1-16)
   Future<void> saveBillToVault(String patientId, BillRecordModel bill) async {
-    final index = _localPatientsStore.indexWhere((p) => p.id == patientId);
-    if (index != -1) {
-      final currentBills = List<BillRecordModel>.from(_localPatientsStore[index].bills);
+    if (_sessionPatients.containsKey(patientId)) {
+      final patient = _sessionPatients[patientId]!;
+      final currentBills = List<BillRecordModel>.from(patient.bills);
       currentBills.insert(0, bill);
-      _localPatientsStore[index] = _localPatientsStore[index].copyWith(bills: currentBills);
+      _sessionPatients[patientId] = patient.copyWith(bills: currentBills);
     }
   }
 
   /// Add clinical document to patient profile (V1-17)
   Future<void> addDocument(String patientId, PatientDocumentModel document) async {
-    final index = _localPatientsStore.indexWhere((p) => p.id == patientId);
-    if (index != -1) {
-      final currentDocs = List<PatientDocumentModel>.from(_localPatientsStore[index].documents);
+    if (_sessionPatients.containsKey(patientId)) {
+      final patient = _sessionPatients[patientId]!;
+      final currentDocs = List<PatientDocumentModel>.from(patient.documents);
       currentDocs.insert(0, document);
-      _localPatientsStore[index] = _localPatientsStore[index].copyWith(documents: currentDocs);
+      _sessionPatients[patientId] = patient.copyWith(documents: currentDocs);
     }
   }
 
   /// Patient side: toggle completion of an assigned exercise (V1-10)
   Future<void> toggleExerciseCompletion(String patientId, String assignedExerciseId, bool completed) async {
-    final index = _localPatientsStore.indexWhere((p) => p.id == patientId);
-    if (index != -1) {
-      final patient = _localPatientsStore[index];
+    if (_sessionPatients.containsKey(patientId)) {
+      final patient = _sessionPatients[patientId]!;
       if (patient.treatmentPrograms.isNotEmpty) {
         final activeProgram = patient.treatmentPrograms.first;
         final updatedExercises = activeProgram.assignedExercises.map((ex) {
@@ -766,7 +387,7 @@ class PatientService {
 
         final updatedPrograms = List<TreatmentProgramModel>.from(patient.treatmentPrograms);
         updatedPrograms[0] = activeProgram.copyWith(assignedExercises: updatedExercises);
-        _localPatientsStore[index] = patient.copyWith(treatmentPrograms: updatedPrograms);
+        _sessionPatients[patientId] = patient.copyWith(treatmentPrograms: updatedPrograms);
       }
     }
   }

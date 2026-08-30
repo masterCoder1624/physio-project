@@ -56,7 +56,6 @@ class _PatientListScreenState extends State<PatientListScreen> {
     super.dispose();
   }
 
-  // Existing PatientService flow is preserved.
   Future<void> _fetchPatients() async {
     if (mounted) setState(() => _isLoading = true);
 
@@ -64,110 +63,37 @@ class _PatientListScreenState extends State<PatientListScreen> {
       final models = await _patientService.getPatients();
       if (!mounted) return;
 
-      if (models.isNotEmpty) {
-        final patients = models.map((m) {
-          return _PatientItem(
-            id: m.id ?? '',
-            name: m.name,
-            condition: m.condition.isNotEmpty
-                ? m.condition
-                : 'Physical Rehabilitation',
-            status: m.status.toUpperCase(),
-            age: m.age,
-            gender: m.gender ?? 'Not specified',
-            lastVisit: '2026-07-20',
-            phone: m.phone ?? '+91 98765 43210',
-            createdAt: m.createdAt,
-            initials: _getInitials(m.name),
-            avatarBgColor: _kPrimaryCyan,
-          );
-        }).toList();
+      final patients = models.map((m) {
+        return _PatientItem(
+          id: m.id ?? '',
+          name: m.name,
+          condition: m.condition.isNotEmpty
+              ? m.condition
+              : 'Physical Rehabilitation',
+          status: m.status.toUpperCase(),
+          age: m.age,
+          gender: m.gender ?? 'Not specified',
+          lastVisit: '2026-07-20',
+          phone: m.phone ?? '+91 98765 43210',
+          createdAt: m.createdAt,
+          initials: _getInitials(m.name),
+          avatarBgColor: _kPrimaryCyan,
+        );
+      }).toList();
 
-        setState(() {
-          _allPatients = patients;
-          _filteredPatients = _filterPatients(patients);
-          _isLoading = false;
-        });
-      } else {
-        _loadDemoPatients();
-      }
+      setState(() {
+        _allPatients = patients;
+        _filteredPatients = _filterPatients(patients);
+        _isLoading = false;
+      });
     } catch (_) {
       if (!mounted) return;
-      _loadDemoPatients();
+      setState(() {
+        _allPatients = [];
+        _filteredPatients = [];
+        _isLoading = false;
+      });
     }
-  }
-
-  // Existing frontend demo fallback is preserved.
-  void _loadDemoPatients() {
-    final demoList = [
-      _PatientItem(
-        id: '1',
-        name: 'Ananya Sharma',
-        condition: 'Knee Injury Rehabilitation',
-        status: 'ACTIVE',
-        age: '32',
-        gender: 'Female',
-        lastVisit: '2026-07-20',
-        phone: '+91 98765 43210',
-        initials: 'AS',
-        avatarBgColor: _kPrimaryCyan,
-      ),
-      _PatientItem(
-        id: '2',
-        name: 'Rahul Mehta',
-        condition: 'Lower Back Pain',
-        status: 'PENDING',
-        age: '29',
-        gender: 'Male',
-        lastVisit: '2026-07-15',
-        phone: '+91 87654 32109',
-        initials: 'RM',
-        avatarBgColor: const Color(0xFF22B8C8),
-      ),
-      _PatientItem(
-        id: '3',
-        name: 'Priya Patel',
-        condition: 'Shoulder Impingement',
-        status: 'COMPLETED',
-        age: '34',
-        gender: 'Female',
-        lastVisit: '2026-07-10',
-        phone: '+91 76543 21098',
-        initials: 'PP',
-        avatarBgColor: const Color(0xFF4DC7D4),
-      ),
-      _PatientItem(
-        id: '4',
-        name: 'Vikram Singh',
-        condition: 'Post-ACL Surgery Rehab',
-        status: 'NEED FOLLOWUP',
-        age: '31',
-        gender: 'Male',
-        lastVisit: '2026-07-05',
-        phone: '+91 65432 10987',
-        initials: 'VS',
-        avatarBgColor: const Color(0xFF00AFC1),
-      ),
-      _PatientItem(
-        id: '5',
-        name: 'Siddharth Rao',
-        condition: 'Cervical Spondylosis',
-        status: 'ACTIVE',
-        age: '27',
-        gender: 'Male',
-        lastVisit: '2026-07-01',
-        phone: '+91 91234 56789',
-        initials: 'SR',
-        avatarBgColor: const Color(0xFF32B9C8),
-      ),
-    ];
-
-    if (!mounted) return;
-    setState(() {
-      _allPatients = demoList;
-      _filteredPatients = _filterPatients(demoList);
-      _isLoading = false;
-    });
   }
 
   void _onSearchChanged() {

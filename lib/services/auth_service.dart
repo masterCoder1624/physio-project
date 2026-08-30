@@ -1,6 +1,7 @@
 import '../core/network/api_client.dart';
 import '../core/storage/local_storage_service.dart';
 import '../models/user_model.dart';
+import 'patient_service.dart';
 
 class AuthService {
   AuthService({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
@@ -73,6 +74,7 @@ class AuthService {
   }
 
   Future<void> logout() async {
+    PatientService().clearSession();
     await LocalStorageService.clearAll();
   }
 
