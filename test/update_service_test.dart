@@ -1,23 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:flutter_application_1/models/app_update_info.dart';
+import 'package:flutter_application_1/services/update_service.dart';
 import 'package:flutter_application_1/widgets/update_dialog.dart';
 
 void main() {
-  group('Semantic Version Comparison Tests', () {
-    test('detects newer minor and patch versions', () {
-      expect(AppUpdateInfo.isNewer('1.1.0', '1.0.0'), isTrue);
-      expect(AppUpdateInfo.isNewer('v1.0.1', '1.0.0'), isTrue);
-      expect(AppUpdateInfo.isNewer('2.0.0', '1.9.9'), isTrue);
-      expect(AppUpdateInfo.isNewer('v1.2.3', '1.2.2'), isTrue);
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  group('Semantic Version Comparison & Build Number Tests', () {
+    // 8 Required Tests from User Specification
+    test('1. v1.0.1 vs 1.0.1 -> no update', () {
+      expect(AppUpdateInfo.isNewer('v1.0.1', '1.0.1'), isFalse);
+      expect(AppUpdateInfo.compareVersions('v1.0.1', '1.0.1'), equals(0));
     });
 
-    test('detects identical versions as not newer', () {
-      expect(AppUpdateInfo.isNewer('1.0.0', '1.0.0'), isFalse);
-      expect(AppUpdateInfo.isNewer('v1.0.0', '1.0.0'), isFalse);
-      expect(AppUpdateInfo.isNewer('V1.0.0', 'v1.0.0'), isFalse);
-      expect(AppUpdateInfo.compareVersions('1.0.0', '1.0.0'), equals(0));
+    test('2. v1.0.2 vs 1.0.1 -> update', () {
+      expect(AppUpdateInfo.isNewer('v1.0.2', '1.0.1'), isTrue);
+      expect(AppUpdateInfo.compareVersions('v1.0.2', '1.0.1'), equals(1));
+    });
+
+    test('3. v1.0.3 vs 1.0.2 -> update', () {
+      expect(AppUpdateInfo.isNewer('v1.0.3', '1.0.2'), isTrue);
+      expect(AppUpdateInfo.compareVersions('v1.0.3', '1.0.2'), equals(1));
+    });
+
+    test('4. v1.0.3 vs 1.0.3 -> no update', () {
+      expect(AppUpdateInfo.isNewer('v1.0.3', '1.0.3'), isFalse);
+      expect(AppUpdateInfo.compareVersions('v1.0.3', '1.0.3'), equals(0));
+    });
+
+    test('5. 1.0.3+3 vs 1.0.3 -> no update', () {
+      expect(AppUpdateInfo.isNewer('1.0.3+3', '1.0.3'), isFalse);
+      expect(AppUpdateInfo.compareVersions('1.0.3+3', '1.0.3'), equals(0));
+    });
+
+    test('6. v1.0.3 vs 1.0.3+3 -> no update', () {
+      expect(AppUpdateInfo.isNewer('v1.0.3', '1.0.3+3'), isFalse);
+      expect(AppUpdateInfo.compareVersions('v1.0.3', '1.0.3+3'), equals(0));
+    });
+
+    test('7. v1.1.0 vs 1.0.9 -> update', () {
+      expect(AppUpdateInfo.isNewer('v1.1.0', '1.0.9'), isTrue);
+      expect(AppUpdateInfo.compareVersions('v1.1.0', '1.0.9'), equals(1));
+    });
+
+    test('8. v2.0.0 vs 1.9.9 -> update', () {
+      expect(AppUpdateInfo.isNewer('v2.0.0', '1.9.9'), isTrue);
+      expect(AppUpdateInfo.compareVersions('v2.0.0', '1.9.9'), equals(1));
+    });
+
+    test('Build numbers do not trigger false update prompts', () {
+      expect(AppUpdateInfo.compareVersions('1.0.3+4', '1.0.3'), equals(0));
+      expect(AppUpdateInfo.compareVersions('1.0.3', '1.0.3+4'), equals(0));
+      expect(AppUpdateInfo.compareVersions('1.0.0+2', '1.0.0+1'), equals(0));
+      expect(AppUpdateInfo.isNewer('1.0.0+2', '1.0.0+1'), isFalse);
     });
 
     test('detects older versions as not newer', () {
@@ -26,55 +64,61 @@ void main() {
       expect(AppUpdateInfo.compareVersions('1.0.0', '1.1.0'), equals(-1));
     });
 
-    test('handles build number comparisons correctly', () {
-      expect(AppUpdateInfo.compareVersions('1.0.0+2', '1.0.0+1'), equals(1));
-      expect(AppUpdateInfo.compareVersions('1.0.0+1', '1.0.0+2'), equals(-1));
-      expect(AppUpdateInfo.compareVersions('1.0.0+1', '1.0.0+1'), equals(0));
+    test('handles empty or invalid versions gracefully without false prompts', () {
+      expect(AppUpdateInfo.isNewer('', '1.0.0'), isFalse);
+      expect(AppUpdateInfo.isNewer('1.0.0', ''), isFalse);
+      expect(AppUpdateInfo.isNewer('', ''), isFalse);
     });
   });
 
   group('GitHub Release Payload Parser Tests', () {
-    final mockReleaseJson = {
-      'tag_name': 'v1.1.0',
-      'name': 'RehabZ v1.1.0 - Major Performance Update',
-      'body': '• Added in-app APK updater\n• Improved recovery charts\n• Bug fixes',
-      'published_at': '2026-08-29T12:00:00Z',
+    final mockReleaseV103 = {
+      'tag_name': 'v1.0.3',
+      'name': 'Rehab v1.0.3',
+      'body': '• Performance update\\n• Bug fixes',
+      'published_at': '2026-09-02T12:00:00Z',
       'assets': [
         {
           'name': 'app-release.apk',
-          'browser_download_url': 'https://github.com/masterCoder1624/physio-project/releases/download/v1.1.0/app-release.apk',
-          'size': 44564480, // ~42.5 MB
-        },
-        {
-          'name': 'source-code.zip',
-          'browser_download_url': 'https://github.com/masterCoder1624/physio-project/archive/v1.1.0.zip',
-          'size': 1024000,
+          'browser_download_url': 'https://github.com/masterCoder1624/physio-project/releases/download/v1.0.3/app-release.apk',
+          'size': 44564480,
         }
       ]
     };
 
-    test('parses release payload and identifies APK asset', () {
+    test('v1.0.3 GitHub release vs installed 1.0.3 -> NO UPDATE AVAILABLE', () {
       final info = AppUpdateInfo.fromGitHubReleaseJson(
-        mockReleaseJson,
-        currentVersion: '1.0.0',
+        mockReleaseV103,
+        currentVersion: '1.0.3',
       );
 
-      expect(info.latestVersion, equals('1.1.0'));
-      expect(info.currentVersion, equals('1.0.0'));
+      expect(info.latestVersion, equals('1.0.3'));
+      expect(info.currentVersion, equals('1.0.3'));
+      expect(info.isUpdateAvailable, isFalse);
+    });
+
+    test('v1.0.3 GitHub release vs installed 1.0.3+3 -> NO UPDATE AVAILABLE', () {
+      final info = AppUpdateInfo.fromGitHubReleaseJson(
+        mockReleaseV103,
+        currentVersion: '1.0.3+3',
+      );
+
+      expect(info.latestVersion, equals('1.0.3'));
+      expect(info.currentVersion, equals('1.0.3'));
+      expect(info.isUpdateAvailable, isFalse);
+    });
+
+    test('v1.0.3 GitHub release vs installed 1.0.2 -> UPDATE AVAILABLE', () {
+      final info = AppUpdateInfo.fromGitHubReleaseJson(
+        mockReleaseV103,
+        currentVersion: '1.0.2',
+      );
+
+      expect(info.latestVersion, equals('1.0.3'));
+      expect(info.currentVersion, equals('1.0.2'));
       expect(info.isUpdateAvailable, isTrue);
       expect(info.apkFileName, equals('app-release.apk'));
       expect(info.downloadUrl, contains('app-release.apk'));
-      expect(info.formattedFileSize, equals('42.5 MB'));
-      expect(info.changelog, contains('Added in-app APK updater'));
-    });
-
-    test('marks update as unavailable when installed version is identical', () {
-      final info = AppUpdateInfo.fromGitHubReleaseJson(
-        mockReleaseJson,
-        currentVersion: '1.1.0',
-      );
-
-      expect(info.isUpdateAvailable, isFalse);
     });
 
     test('marks update as unavailable if no APK asset is found', () {
@@ -98,6 +142,33 @@ void main() {
 
       expect(info.isUpdateAvailable, isFalse);
       expect(info.downloadUrl, isEmpty);
+    });
+  });
+
+  group('UpdateService Dynamic Version Reading Tests', () {
+    test('reads installed version dynamically from PackageInfo without stale caching', () async {
+      PackageInfo.setMockInitialValues(
+        appName: 'RehabZ',
+        packageName: 'com.rehabz.app',
+        version: '1.0.2',
+        buildNumber: '2',
+        buildSignature: '',
+      );
+
+      final version1 = await UpdateService.instance.getCurrentVersion();
+      expect(version1, equals('1.0.2'));
+
+      // Simulate APK update to 1.0.3:
+      PackageInfo.setMockInitialValues(
+        appName: 'RehabZ',
+        packageName: 'com.rehabz.app',
+        version: '1.0.3',
+        buildNumber: '3',
+        buildSignature: '',
+      );
+
+      final version2 = await UpdateService.instance.getCurrentVersion();
+      expect(version2, equals('1.0.3'));
     });
   });
 

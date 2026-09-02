@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -29,40 +30,53 @@ class UpdateService {
   static const MethodChannel _channel = MethodChannel('com.rehabz.app/updater');
   static const String _keyLastCheck = 'rehabz_last_update_check_time';
 
-  String? _cachedCurrentVersion;
-  AppUpdateInfo? _cachedUpdateInfo;
   bool _isChecking = false;
   String? _sessionDismissedVersion;
 
-  /// Returns the current installed application version from package manager
+  /// Returns the current installed application version from package manager.
+  /// Does NOT cache permanently so that post-update checks read the new version.
   Future<String> getCurrentVersion() async {
-    if (_cachedCurrentVersion != null) return _cachedCurrentVersion!;
     try {
       final info = await PackageInfo.fromPlatform();
-      _cachedCurrentVersion = info.version.isNotEmpty ? info.version : '1.0.0';
-    } catch (_) {
-      _cachedCurrentVersion = '1.0.0';
+      final version = info.version.trim();
+      if (version.isNotEmpty) {
+        return version;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[UpdateService] Failed to read PackageInfo: $e');
+      }
     }
-    return _cachedCurrentVersion!;
+    throw UpdateException('Unable to determine installed application version.');
   }
 
   /// Checks GitHub Releases for a newer version.
   /// If [force] is true, ignores the time-based cooldown.
   Future<AppUpdateInfo?> checkForUpdate({bool force = false}) async {
-    if (_isChecking) return _cachedUpdateInfo;
+    if (_isChecking) return null;
 
     // Check cooldown unless it's a user-initiated manual check
     if (!force) {
       final canCheck = await _canPerformAutoCheck();
-      if (!canCheck && _cachedUpdateInfo != null) {
-        return _cachedUpdateInfo;
+      if (!canCheck) {
+        return null;
       }
     }
 
     _isChecking = true;
 
     try {
-      final currentVersion = await getCurrentVersion();
+      final packageInfo = await PackageInfo.fromPlatform();
+      final installedVersion = packageInfo.version.trim();
+      final installedBuildNumber = packageInfo.buildNumber.trim();
+
+      if (installedVersion.isEmpty) {
+        if (kDebugMode) {
+          debugPrint('[UpdateService] Installed version is empty, skipping update check.');
+        }
+        return null;
+      }
+
       final uri = Uri.parse(AppConfig.latestReleaseApiUrl);
 
       final response = await http.get(
@@ -77,11 +91,26 @@ class UpdateService {
         final Map<String, dynamic> data = json.decode(response.body) as Map<String, dynamic>;
         final updateInfo = AppUpdateInfo.fromGitHubReleaseJson(
           data,
-          currentVersion: currentVersion,
+          currentVersion: installedVersion,
           preferredApkName: AppConfig.defaultApkAssetName,
         );
 
-        _cachedUpdateInfo = updateInfo;
+        final rawTag = data['tag_name'] as String? ?? '';
+        final cleanLatestVersion = AppUpdateInfo.cleanVersionString(rawTag);
+        final cleanCurrentVersion = AppUpdateInfo.cleanVersionString(installedVersion);
+        final comparisonResult = AppUpdateInfo.compareVersions(cleanLatestVersion, cleanCurrentVersion);
+        final hasNewerVersion = AppUpdateInfo.isNewer(cleanLatestVersion, cleanCurrentVersion);
+
+        if (kDebugMode) {
+          debugPrint('[UpdateService] Installed version: $installedVersion');
+          debugPrint('[UpdateService] Installed build number: $installedBuildNumber');
+          debugPrint('[UpdateService] GitHub tag: $rawTag');
+          debugPrint('[UpdateService] Clean GitHub version: $cleanLatestVersion');
+          debugPrint('[UpdateService] Clean installed version: $cleanCurrentVersion');
+          debugPrint('[UpdateService] Comparison result: $comparisonResult');
+          debugPrint('[UpdateService] hasNewerVersion: $hasNewerVersion');
+        }
+
         await _recordCheckTimestamp();
         return updateInfo;
       } else if (response.statusCode == 404) {
@@ -91,8 +120,10 @@ class UpdateService {
         // Other GitHub API status
         return null;
       }
-    } catch (_) {
-      // Fail silently without interrupting app usage
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[UpdateService] Error during auto update check: $e');
+      }
       return null;
     } finally {
       _isChecking = false;
@@ -110,7 +141,14 @@ class UpdateService {
     _isChecking = true;
 
     try {
-      final currentVersion = await getCurrentVersion();
+      final packageInfo = await PackageInfo.fromPlatform();
+      final installedVersion = packageInfo.version.trim();
+      final installedBuildNumber = packageInfo.buildNumber.trim();
+
+      if (installedVersion.isEmpty) {
+        throw UpdateException('Unable to determine installed application version.');
+      }
+
       final uri = Uri.parse(AppConfig.latestReleaseApiUrl);
 
       final response = await http.get(
@@ -125,10 +163,26 @@ class UpdateService {
         final Map<String, dynamic> data = json.decode(response.body) as Map<String, dynamic>;
         final updateInfo = AppUpdateInfo.fromGitHubReleaseJson(
           data,
-          currentVersion: currentVersion,
+          currentVersion: installedVersion,
           preferredApkName: AppConfig.defaultApkAssetName,
         );
-        _cachedUpdateInfo = updateInfo;
+
+        final rawTag = data['tag_name'] as String? ?? '';
+        final cleanLatestVersion = AppUpdateInfo.cleanVersionString(rawTag);
+        final cleanCurrentVersion = AppUpdateInfo.cleanVersionString(installedVersion);
+        final comparisonResult = AppUpdateInfo.compareVersions(cleanLatestVersion, cleanCurrentVersion);
+        final hasNewerVersion = AppUpdateInfo.isNewer(cleanLatestVersion, cleanCurrentVersion);
+
+        if (kDebugMode) {
+          debugPrint('[UpdateService] Installed version: $installedVersion');
+          debugPrint('[UpdateService] Installed build number: $installedBuildNumber');
+          debugPrint('[UpdateService] GitHub tag: $rawTag');
+          debugPrint('[UpdateService] Clean GitHub version: $cleanLatestVersion');
+          debugPrint('[UpdateService] Clean installed version: $cleanCurrentVersion');
+          debugPrint('[UpdateService] Comparison result: $comparisonResult');
+          debugPrint('[UpdateService] hasNewerVersion: $hasNewerVersion');
+        }
+
         await _recordCheckTimestamp();
         return updateInfo;
       } else if (response.statusCode == 404) {
@@ -141,7 +195,10 @@ class UpdateService {
       }
     } on UpdateException {
       rethrow;
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[UpdateService] Error during manual update check: $e');
+      }
       throw UpdateException(
           'Unable to check for updates. Please check your internet connection and try again.');
     } finally {
@@ -244,6 +301,8 @@ class UpdateService {
     if (!await file.exists()) {
       throw UpdateException('APK file not found at $filePath');
     }
+
+    _sessionDismissedVersion = null;
 
     try {
       final bool? result = await _channel.invokeMethod<bool>('installApk', {
