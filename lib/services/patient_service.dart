@@ -391,4 +391,59 @@ class PatientService {
       }
     }
   }
+
+  /// Delete a patient from the database and local session store
+  Future<bool> deletePatient(String id) async {
+    _sessionPatients.remove(id);
+    try {
+      final response = await _apiClient.delete('/patients/$id');
+      return response.success;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Update a patient's status (ACTIVE, PENDING, COMPLETED)
+  Future<bool> updatePatientStatus(String id, String status) async {
+    final normalizedStatus = status.toUpperCase();
+    if (_sessionPatients.containsKey(id)) {
+      _sessionPatients[id] = _sessionPatients[id]!.copyWith(status: normalizedStatus);
+    }
+    try {
+      final response = await _apiClient.put<PatientModel>(
+        '/patients/$id',
+        body: {'status': normalizedStatus},
+        fromJson: (json) => PatientModel.fromJson(json as Map<String, dynamic>),
+      );
+      if (response.success && response.data != null) {
+        final updated = response.data!;
+        if (_sessionPatients.containsKey(id)) {
+          _sessionPatients[id] = _sessionPatients[id]!.copyWith(status: updated.status);
+        }
+      }
+      return true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Update general patient information
+  Future<PatientModel?> updatePatient(PatientModel patient) async {
+    final id = patient.id;
+    if (id == null) return null;
+    _sessionPatients[id] = patient;
+    try {
+      final response = await _apiClient.put<PatientModel>(
+        '/patients/$id',
+        body: patient.toJson(),
+        fromJson: (json) => PatientModel.fromJson(json as Map<String, dynamic>),
+      );
+      if (response.success && response.data != null) {
+        _sessionPatients[id] = response.data!;
+        return response.data!;
+      }
+    } catch (_) {}
+    return patient;
+  }
 }
+

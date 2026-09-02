@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../models/appointment_model.dart';
+import '../../services/appointment_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/chat_service.dart';
 import '../../services/patient_service.dart';
+import 'add_patient_screen.dart';
 import 'calendar_screen.dart';
 import 'patient_detail_screen.dart';
 import 'patient_list_screen.dart';
@@ -11,7 +14,7 @@ import 'physio_navigation.dart';
 import 'physio_main_shell.dart';
 import '../auth/login_screen.dart';
 
-// RehabZ frontend theme — unchanged.
+// RehabZ frontend theme — preserved exactly.
 const Color kPrimaryCyan = Color(0xFF00AFC1);
 const Color kDarkCyan = Color(0xFF008C9E);
 const Color kLightCyan = Color(0xFFE8F9FB);
@@ -41,13 +44,14 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
   bool _isLoading = true;
   String? _errorMessage;
 
-  String _physioName = 'Dr. Alex';
-  String _specialty = 'Sports & Orthopedic Physiotherapy';
-  int _todayPatientsCount = 0;
-  final int _pendingBookingsCount = 0;
-  final int _completedThisWeek = 0;
+  String _physioName = '';
+  String _specialty = 'Physiotherapist';
+  int _totalPatientsCount = 0;
+  int _todayAppointmentsCount = 0;
+  int _completedAppointmentsCount = 0;
   int _unreadMessagesCount = 0;
-  List<DashboardPatient> _todayPatients = [];
+  List<DashboardPatient> _patientList = [];
+  List<AppointmentModel> _todayAppointments = [];
   int _selectedIndex = 0;
 
   @override
@@ -66,26 +70,37 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
     try {
       final userFuture = AuthService().getProfile();
       final patientsFuture = PatientService().getPatients();
+      final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+      final appointmentsFuture = AppointmentService().getAppointments(date: todayStr);
       final unreadFuture = ChatService().getUnreadCount();
+
       final user = await userFuture;
       final patientModels = await patientsFuture;
+      final appointments = await appointmentsFuture;
       final unread = await unreadFuture;
 
       final patients = patientModels.map((p) => DashboardPatient(
         id: p.id ?? '',
         name: p.name,
-        condition: p.condition,
-        phone: p.phone ?? 'No number',
-        time: '10:00 AM',
-        status: 'CONFIRMED',
+        condition: p.condition.isNotEmpty ? p.condition : 'Physical Rehabilitation',
+        phone: p.phone ?? '',
+        time: p.createdAt ?? '',
+        status: p.status.toUpperCase(),
       )).toList();
+
+      final completedAppointments = appointments.where(
+        (a) => a.status.toLowerCase() == 'completed',
+      ).length;
 
       if (!mounted) return;
       setState(() {
-        _physioName = user.fullName.isNotEmpty ? user.fullName : 'Dr. Alex';
+        _physioName = user.fullName.isNotEmpty ? user.fullName : (user.firstName.isNotEmpty ? user.firstName : 'Physiotherapist');
         _specialty = 'Sports & Orthopedic Physiotherapy';
-        _todayPatientsCount = patients.length;
-        _todayPatients = patients;
+        _totalPatientsCount = patients.length;
+        _patientList = patients;
+        _todayAppointments = appointments;
+        _todayAppointmentsCount = appointments.length;
+        _completedAppointmentsCount = completedAppointments;
         _unreadMessagesCount = unread;
         _isLoading = false;
       });
@@ -104,6 +119,19 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
     await AuthService().logout();
     if (!mounted) return;
     await PhysioNavigation.pushAndClear(context, const LoginScreen());
+  }
+
+  String get _greeting {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning,';
+    if (hour < 17) return 'Good afternoon,';
+    return 'Good evening,';
+  }
+
+  String get _displayPhysioName {
+    final name = _physioName.trim();
+    if (name.isEmpty) return 'Doctor';
+    return name.startsWith('Dr.') ? name : 'Dr. $name';
   }
 
   @override
@@ -144,6 +172,9 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
     );
   }
 
+  // ============================================================
+  // HEADER — Hamburger menu icon removed cleanly
+  // ============================================================
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 22),
@@ -159,12 +190,16 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
         children: [
           Row(
             children: [
-              _headerIconButton(Icons.menu_rounded, () {}),
-              const SizedBox(width: 12),
               const Expanded(
-                child: Text('RehabZ', style: TextStyle(
-                  color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800,
-                )),
+                child: Text(
+                  'RehabZ',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                ),
               ),
               Stack(
                 clipBehavior: Clip.none,
@@ -198,22 +233,13 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
                 ],
               ),
               const SizedBox(width: 8),
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  _headerIconButton(Icons.notifications_none_rounded, () {}),
-                  Positioned(
-                    right: 0, top: -1,
-                    child: Container(
-                      width: 19, height: 19,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(color: kError, shape: BoxShape.circle),
-                      child: const Text('3', style: TextStyle(
-                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800,
-                      )),
-                    ),
-                  ),
-                ],
+              _headerIconButton(
+                Icons.notifications_none_rounded,
+                () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('No new notifications')),
+                  );
+                },
               ),
             ],
           ),
@@ -226,17 +252,32 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Good morning,', style: TextStyle(
-                      color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500,
-                    )),
-                    const SizedBox(height: 3),
-                    Text(_displayPhysioName, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    Text(
+                      _greeting,
                       style: const TextStyle(
-                        color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800,
-                      )),
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _displayPhysioName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(_specialty, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    Text(
+                      _specialty,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
                   ],
                 ),
               ),
@@ -247,19 +288,19 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
             children: [
               const Icon(Icons.calendar_today_outlined, color: Colors.white, size: 16),
               const SizedBox(width: 8),
-              Text(_formatDate(DateTime.now()), style: const TextStyle(
-                color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600,
-              )),
+              Text(
+                _formatDate(DateTime.now()),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ],
       ),
     );
-  }
-
-  String get _displayPhysioName {
-    if (_physioName.trim().isEmpty) return 'Dr. Alex';
-    return _physioName.startsWith('Dr.') ? _physioName : 'Dr. $_physioName';
   }
 
   Widget _headerIconButton(IconData icon, VoidCallback onTap) {
@@ -282,25 +323,52 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
       onTap: _signOut,
       customBorder: const CircleBorder(),
       child: Container(
-        width: 68, height: 68,
+        width: 68,
+        height: 68,
         decoration: BoxDecoration(
-          color: Colors.white, shape: BoxShape.circle,
+          color: Colors.white,
+          shape: BoxShape.circle,
           border: Border.all(color: Colors.white.withValues(alpha: .8), width: 3),
-          boxShadow: [BoxShadow(
-            color: Colors.black.withValues(alpha: .12), blurRadius: 12, offset: const Offset(0, 5),
-          )],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: .12),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+            )
+          ],
         ),
         child: CircleAvatar(
           backgroundColor: kLightCyan,
-          child: Text(_getInitials(_physioName), style: const TextStyle(
-            color: kDarkCyan, fontSize: 21, fontWeight: FontWeight.w800,
-          )),
+          child: Text(
+            _getInitials(_physioName),
+            style: const TextStyle(
+              color: kDarkCyan,
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
       ),
     );
   }
 
+  // ============================================================
+  // DASHBOARD CONTENT ROUTING (Empty vs Active)
+  // ============================================================
   Widget _buildDashboardContent() {
+    if (_totalPatientsCount == 0) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildTodayOverview(),
+          const SizedBox(height: 18),
+          _buildWelcomeCard(),
+          const SizedBox(height: 18),
+          _buildEmptyPatientsSection(),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -327,46 +395,69 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
     );
   }
 
+  // ============================================================
+  // TODAY'S OVERVIEW — Dynamic metrics
+  // ============================================================
   Widget _buildTodayOverview() {
-    final total = _todayPatientsCount;
-    final completed = total == 0 ? 0 : (_completedThisWeek > total ? total : _completedThisWeek);
-    final remaining = total > completed ? total - completed : 0;
-    final progress = total == 0 ? 0.0 : completed / total;
+    final totalPatients = _totalPatientsCount;
+    final totalAppointments = _todayAppointmentsCount;
+    final completed = _completedAppointmentsCount;
+    final progress = totalAppointments == 0 ? 0.0 : (completed / totalAppointments).clamp(0.0, 1.0);
 
     return _card(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('TODAY\'S OVERVIEW', style: TextStyle(
-            color: kDarkCyan, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: .5,
-          )),
+          const Text(
+            'TODAY\'S OVERVIEW',
+            style: TextStyle(
+              color: kDarkCyan,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: .5,
+            ),
+          ),
           const SizedBox(height: 14),
-          Row(children: [
-            Expanded(child: _numberMetric('$total', 'Appointments')),
-            _divider(),
-            Expanded(child: _numberMetric('$completed', 'Completed')),
-            _divider(),
-            Expanded(child: _numberMetric('$remaining', 'Remaining')),
-          ]),
+          Row(
+            children: [
+              Expanded(child: _numberMetric('$totalPatients', 'Patients')),
+              _divider(),
+              Expanded(child: _numberMetric('$totalAppointments', 'Appointments')),
+              _divider(),
+              Expanded(child: _numberMetric('$completed', 'Completed')),
+            ],
+          ),
           const SizedBox(height: 16),
-          Row(children: [
-            Expanded(child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: LinearProgressIndicator(
-                minHeight: 8, value: progress,
-                backgroundColor: kLightCyan,
-                valueColor: const AlwaysStoppedAnimation(kPrimaryCyan),
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: LinearProgressIndicator(
+                    minHeight: 8,
+                    value: progress,
+                    backgroundColor: kLightCyan,
+                    valueColor: const AlwaysStoppedAnimation(kPrimaryCyan),
+                  ),
+                ),
               ),
-            )),
-            const SizedBox(width: 10),
-            Text('${(progress * 100).round()}%', style: const TextStyle(
-              color: kTextPrimary, fontSize: 12, fontWeight: FontWeight.w800,
-            )),
-          ]),
+              const SizedBox(width: 10),
+              Text(
+                '${(progress * 100).round()}%',
+                style: const TextStyle(
+                  color: kTextPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 7),
           Text(
-            total == 0 ? 'No appointments are available yet.' : '$completed of $total scheduled sessions completed',
+            totalAppointments == 0
+                ? (totalPatients == 0 ? 'No patients or appointments yet.' : 'No appointments scheduled for today.')
+                : '$completed of $totalAppointments scheduled sessions completed',
             style: const TextStyle(color: kTextSecondary, fontSize: 10.5),
           ),
         ],
@@ -374,195 +465,546 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
     );
   }
 
+  // ============================================================
+  // WELCOMING FIRST-ACCOUNT CARD (New User Empty State)
+  // ============================================================
+  Widget _buildWelcomeCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kBorder),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF123047).withValues(alpha: .045),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: kLightCyan,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.waving_hand_rounded, color: kDarkCyan, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Welcome to RehabZ 👋',
+                  style: TextStyle(
+                    color: kTextPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Your clinic workspace is ready.',
+            style: TextStyle(
+              color: kTextPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Start by adding your first patient to begin managing your physiotherapy practice digitally.',
+            style: TextStyle(
+              color: kTextSecondary,
+              fontSize: 12.5,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [kPrimaryCyan, kDarkCyan],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: kPrimaryCyan.withValues(alpha: 0.28),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () async {
+                  await PhysioNavigation.push(context, const AddPatientScreen());
+                  _loadDashboardData();
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: const Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.person_add_alt_1_rounded, color: Colors.white, size: 19),
+                      SizedBox(width: 8),
+                      Text(
+                        '+ Add Your First Patient',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // EMPTY PATIENTS SECTION
+  // ============================================================
+  Widget _buildEmptyPatientsSection() {
+    return _card(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+      child: Column(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: const BoxDecoration(
+              color: kLightCyan,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.people_outline_rounded, color: kDarkCyan, size: 26),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'No patients yet',
+            style: TextStyle(
+              color: kTextPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Start building your digital clinic by adding your first patient.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: kTextSecondary,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await PhysioNavigation.push(context, const AddPatientScreen());
+              _loadDashboardData();
+            },
+            icon: const Icon(Icons.add, size: 16, color: kDarkCyan),
+            label: const Text('+ Add Patient', style: TextStyle(color: kDarkCyan, fontWeight: FontWeight.w800)),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: kPrimaryCyan),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // NEXT PATIENT CARD
+  // ============================================================
   Widget _buildNextPatientCard() {
-    final patient = _todayPatients.isEmpty ? null : _todayPatients.first;
+    final patient = _patientList.isEmpty ? null : _patientList.first;
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [kDarkCyan, kPrimaryCyan],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(
-          color: kDarkCyan.withValues(alpha: .20), blurRadius: 18, offset: const Offset(0, 8),
-        )],
+        boxShadow: [
+          BoxShadow(
+            color: kDarkCyan.withValues(alpha: .20),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          )
+        ],
       ),
       child: patient == null
-          ? const Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('NEXT PATIENT', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: .6)),
-                SizedBox(height: 8),
-                Text('Your next appointment will appear here.', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
-              ])),
-              Icon(Icons.event_available_rounded, color: Colors.white70, size: 42),
-            ])
-          : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('NEXT PATIENT', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: .6)),
-              const SizedBox(height: 7),
-              const Text('10:00 AM', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 13),
-              Row(children: [
-                Container(
-                  width: 54, height: 54, alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle, color: Colors.white.withValues(alpha: .10),
-                    border: Border.all(color: Colors.white.withValues(alpha: .85)),
+          ? const Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'NEXT PATIENT',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: .6,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Your next appointment will appear here.',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
-                  child: Text(patient.initials, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
                 ),
-                const SizedBox(width: 12),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(patient.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 3),
-                  Text(patient.condition, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(10)),
-                    child: const Text('Confirmed', style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w700)),
+                Icon(Icons.event_available_rounded, color: Colors.white70, size: 42),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'RECENT PATIENT',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .6,
                   ),
-                ])),
-                const SizedBox(width: 8),
-                Material(
-                  color: Colors.white, borderRadius: BorderRadius.circular(12),
-                  child: InkWell(
-                    onTap: patient.id.isEmpty ? null : () => _navigateTo(PatientDetailScreen(patientId: patient.id, initialTabIndex: 0)),
-                    borderRadius: BorderRadius.circular(12),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 11, vertical: 11),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Text('Profile', style: TextStyle(color: kDarkCyan, fontSize: 10.5, fontWeight: FontWeight.w800)),
-                        SizedBox(width: 4),
-                        Icon(Icons.arrow_forward_rounded, color: kDarkCyan, size: 16),
-                      ]),
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  patient.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 13),
+                Row(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: .10),
+                        border: Border.all(color: Colors.white.withValues(alpha: .85)),
+                      ),
+                      child: Text(
+                        patient.initials,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            patient.condition,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: .14),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              patient.status,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Material(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        onTap: patient.id.isEmpty
+                            ? null
+                            : () => _navigateTo(PatientDetailScreen(patientId: patient.id, initialTabIndex: 0)),
+                        borderRadius: BorderRadius.circular(12),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'View',
+                                style: TextStyle(
+                                  color: kDarkCyan,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              SizedBox(width: 4),
+                              Icon(Icons.arrow_forward_rounded, color: kDarkCyan, size: 16),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ]),
-            ]),
+              ],
+            ),
     );
   }
 
+  // ============================================================
+  // SCHEDULE CARD
+  // ============================================================
   Widget _buildScheduleCard() {
-    final patients = _todayPatients.take(4).toList();
-    if (patients.isEmpty) {
-      return _card(padding: const EdgeInsets.all(22), child: const Column(children: [
-        Icon(Icons.calendar_month_outlined, color: kPrimaryCyan, size: 34),
-        SizedBox(height: 10),
-        Text('No appointments yet', style: TextStyle(color: kTextPrimary, fontSize: 14, fontWeight: FontWeight.w800)),
-        SizedBox(height: 4),
-        Text('Your daily schedule will appear here.', textAlign: TextAlign.center, style: TextStyle(color: kTextSecondary, fontSize: 11)),
-      ]));
+    if (_todayAppointments.isEmpty) {
+      return _card(
+        padding: const EdgeInsets.all(22),
+        child: const Column(
+          children: [
+            Icon(Icons.calendar_month_outlined, color: kPrimaryCyan, size: 34),
+            SizedBox(height: 10),
+            Text(
+              'No appointments scheduled today',
+              style: TextStyle(color: kTextPrimary, fontSize: 14, fontWeight: FontWeight.w800),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Your daily schedule will appear here when appointments are booked.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: kTextSecondary, fontSize: 11),
+            ),
+          ],
+        ),
+      );
     }
 
-    const times = ['09:00 AM', '10:00 AM', '12:00 PM', '04:30 PM'];
     return _card(
       padding: EdgeInsets.zero,
-      child: Column(children: [
-        for (var i = 0; i < patients.length; i++)
-          _ScheduleRow(
-            patient: patients[i],
-            time: times[i],
-            status: i == 0 ? 'Completed' : i == 1 ? 'Starting Soon' : 'Upcoming',
-            isFirst: i == 0,
-            isLast: i == patients.length - 1,
-            onTap: patients[i].id.isEmpty ? null : () => _navigateTo(PatientDetailScreen(patientId: patients[i].id, initialTabIndex: 0)),
-          ),
-      ]),
+      child: Column(
+        children: [
+          for (var i = 0; i < _todayAppointments.length; i++)
+            _ScheduleRow(
+              appointment: _todayAppointments[i],
+              isFirst: i == 0,
+              isLast: i == _todayAppointments.length - 1,
+              onTap: () {
+                final patId = _todayAppointments[i].patientId;
+                if (patId.isNotEmpty) {
+                  _navigateTo(PatientDetailScreen(patientId: patId, initialTabIndex: 0));
+                }
+              },
+            ),
+        ],
+      ),
     );
   }
 
+  // ============================================================
+  // WATCHLIST CARD
+  // ============================================================
   Widget _buildWatchlistCard() {
-    final patients = _todayPatients.take(3).toList();
+    final patients = _patientList.take(3).toList();
     if (patients.isEmpty) {
-      return _card(padding: const EdgeInsets.all(18), child: const Row(children: [
-        CircleAvatar(radius: 20, backgroundColor: kLightCyan, child: Icon(Icons.check_rounded, color: kDarkCyan)),
-        SizedBox(width: 12),
-        Expanded(child: Text('No patients need attention right now.', style: TextStyle(color: kTextSecondary, fontSize: 11.5, fontWeight: FontWeight.w600))),
-      ]));
+      return _card(
+        padding: const EdgeInsets.all(18),
+        child: const Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: kLightCyan,
+              child: Icon(Icons.check_rounded, color: kDarkCyan),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'No patients need attention right now.',
+                style: TextStyle(
+                  color: kTextSecondary,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     const messages = ['Review patient progress', 'Check exercise adherence', 'Follow-up recommended'];
     const colors = [kError, kWarning, kPrimaryCyan];
     return _card(
       padding: EdgeInsets.zero,
-      child: Column(children: [
-        for (var i = 0; i < patients.length; i++)
-          _WatchlistRow(
-            patient: patients[i], color: colors[i], message: messages[i],
-            onTap: patients[i].id.isEmpty ? null : () => _navigateTo(PatientDetailScreen(patientId: patients[i].id, initialTabIndex: i == 1 ? 1 : 0)),
-          ),
-      ]),
+      child: Column(
+        children: [
+          for (var i = 0; i < patients.length; i++)
+            _WatchlistRow(
+              patient: patients[i],
+              color: colors[i % colors.length],
+              message: messages[i % messages.length],
+              onTap: patients[i].id.isEmpty
+                  ? null
+                  : () => _navigateTo(PatientDetailScreen(patientId: patients[i].id, initialTabIndex: i == 1 ? 1 : 0)),
+            ),
+        ],
+      ),
     );
   }
 
+  // ============================================================
+  // PERFORMANCE CARD
+  // ============================================================
   Widget _buildPerformanceCard() {
-    final total = _todayPatientsCount;
-    final completed = total == 0 ? 0 : (_completedThisWeek > total ? total : _completedThisWeek);
-    final rate = total == 0 ? 0 : ((completed / total) * 100).round();
+    final total = _totalPatientsCount;
+    final appts = _todayAppointmentsCount;
+    final completed = _completedAppointmentsCount;
+    final rate = appts == 0 ? 0 : ((completed / appts) * 100).round();
 
     return _card(
       padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Expanded(child: Text('Treatment Performance', style: TextStyle(color: kDarkCyan, fontSize: 13, fontWeight: FontWeight.w800))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Treatment Performance',
+                  style: TextStyle(color: kDarkCyan, fontSize: 13, fontWeight: FontWeight.w800),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(color: kLightCyan, borderRadius: BorderRadius.circular(10)),
+                child: const Text('Today', style: TextStyle(color: kDarkCyan, fontSize: 9.5, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              SizedBox(
+                width: 108,
+                height: 108,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: 96,
+                      height: 96,
+                      child: CircularProgressIndicator(
+                        value: appts == 0 ? 0 : (completed / appts).clamp(0.0, 1.0),
+                        strokeWidth: 10,
+                        backgroundColor: kLightCyan,
+                        valueColor: const AlwaysStoppedAnimation(kPrimaryCyan),
+                      ),
+                    ),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('$rate%', style: const TextStyle(color: kTextPrimary, fontSize: 20, fontWeight: FontWeight.w800)),
+                        const Text('completion', style: TextStyle(color: kTextSecondary, fontSize: 9, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  children: [
+                    _legend(kPrimaryCyan, 'Total Patients', '$total'),
+                    const SizedBox(height: 10),
+                    _legend(kSuccess, 'Completed', '$completed'),
+                    const SizedBox(height: 10),
+                    _legend(kWarning, 'Appointments', '$appts'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-            decoration: BoxDecoration(color: kLightCyan, borderRadius: BorderRadius.circular(10)),
-            child: const Text('Today', style: TextStyle(color: kDarkCyan, fontSize: 9.5, fontWeight: FontWeight.w700)),
+            width: double.infinity,
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(color: kLightCyan, borderRadius: BorderRadius.circular(12)),
+            child: Row(
+              children: [
+                const Icon(Icons.trending_up_rounded, color: kDarkCyan, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    total == 0
+                        ? 'Add patients to start tracking performance.'
+                        : 'Keep your practice moving forward. Complete today\'s sessions.',
+                    style: const TextStyle(color: kDarkCyan, fontSize: 10.5, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ]),
-        const SizedBox(height: 16),
-        Row(children: [
-          SizedBox(
-            width: 108, height: 108,
-            child: Stack(alignment: Alignment.center, children: [
-              SizedBox(width: 96, height: 96, child: CircularProgressIndicator(
-                value: total == 0 ? 0 : completed / total,
-                strokeWidth: 10,
-                backgroundColor: kLightCyan,
-                valueColor: const AlwaysStoppedAnimation(kPrimaryCyan),
-              )),
-              Column(mainAxisSize: MainAxisSize.min, children: [
-                Text('$rate%', style: const TextStyle(color: kTextPrimary, fontSize: 20, fontWeight: FontWeight.w800)),
-                const Text('completion', style: TextStyle(color: kTextSecondary, fontSize: 9, fontWeight: FontWeight.w600)),
-              ]),
-            ]),
-          ),
-          const SizedBox(width: 16),
-          Expanded(child: Column(children: [
-            _legend(kPrimaryCyan, 'Scheduled', '$total'),
-            const SizedBox(height: 10),
-            _legend(kSuccess, 'Completed', '$completed'),
-            const SizedBox(height: 10),
-            _legend(kWarning, 'Pending', '$_pendingBookingsCount'),
-          ])),
-        ]),
-        const SizedBox(height: 14),
-        Container(
-          width: double.infinity, padding: const EdgeInsets.all(11),
-          decoration: BoxDecoration(color: kLightCyan, borderRadius: BorderRadius.circular(12)),
-          child: Row(children: [
-            const Icon(Icons.trending_up_rounded, color: kDarkCyan, size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text(
-              total == 0 ? 'Add appointments to start tracking performance.' : 'Keep your schedule moving and complete today\'s sessions.',
-              style: const TextStyle(color: kDarkCyan, fontSize: 10.5, fontWeight: FontWeight.w700),
-            )),
-          ]),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 
+  // ============================================================
+  // RECENT PATIENTS (Horizontal List)
+  // ============================================================
   Widget _buildRecentPatients() {
-    final patients = _todayPatients.take(4).toList();
+    final patients = _patientList.take(6).toList();
     if (patients.isEmpty) {
-      return _card(padding: const EdgeInsets.all(18), child: const Text(
-        'Recently viewed patients will appear here.', style: TextStyle(color: kTextSecondary, fontSize: 11),
-      ));
+      return _card(
+        padding: const EdgeInsets.all(18),
+        child: const Text(
+          'Recently added patients will appear here.',
+          style: TextStyle(color: kTextSecondary, fontSize: 11),
+        ),
+      );
     }
 
     return SizedBox(
@@ -573,55 +1015,87 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
         separatorBuilder: (context, index) => const SizedBox(width: 10),
         itemBuilder: (_, i) {
           final patient = patients[i];
-          final improving = i.isEven;
+          final active = patient.status == 'ACTIVE';
           return SizedBox(
             width: 150,
             child: Material(
               color: Colors.white,
               borderRadius: BorderRadius.circular(17),
               child: InkWell(
-                onTap: patient.id.isEmpty ? null : () => _navigateTo(PatientDetailScreen(patientId: patient.id, initialTabIndex: 0)),
+                onTap: patient.id.isEmpty
+                    ? null
+                    : () => _navigateTo(PatientDetailScreen(patientId: patient.id, initialTabIndex: 0)),
                 borderRadius: BorderRadius.circular(17),
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(17),
                     border: Border.all(color: kBorder),
-                    boxShadow: [BoxShadow(color: kTextPrimary.withValues(alpha: .035), blurRadius: 10, offset: const Offset(0, 4))],
+                    boxShadow: [
+                      BoxShadow(
+                        color: kTextPrimary.withValues(alpha: .035),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      CircleAvatar(
-                        radius: 22,
-                        backgroundColor: improving ? kLightCyan : const Color(0xFFF0EDFF),
-                        child: Text(patient.initials, style: TextStyle(
-                          color: improving ? kDarkCyan : const Color(0xFF6D5BD0), fontSize: 11, fontWeight: FontWeight.w800,
-                        )),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: active ? kLightCyan : const Color(0xFFF0EDFF),
+                            child: Text(
+                              patient.initials,
+                              style: TextStyle(
+                                color: active ? kDarkCyan : const Color(0xFF6D5BD0),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: kTextSecondary),
+                        ],
+                      ),
+                      const SizedBox(height: 9),
+                      Text(
+                        patient.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: kTextPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        patient.condition,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: kTextSecondary, fontSize: 9.5),
                       ),
                       const Spacer(),
-                      const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: kTextSecondary),
-                    ]),
-                    const SizedBox(height: 9),
-                    Text(patient.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(
-                      color: kTextPrimary, fontSize: 12, fontWeight: FontWeight.w800,
-                    )),
-                    const SizedBox(height: 3),
-                    Text(patient.condition, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(
-                      color: kTextSecondary, fontSize: 9.5,
-                    )),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: improving ? const Color(0xFFEAF9F0) : const Color(0xFFEAF4FF),
-                        borderRadius: BorderRadius.circular(9),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: active ? const Color(0xFFEAF9F0) : const Color(0xFFFFF7ED),
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Text(
+                          patient.status,
+                          style: TextStyle(
+                            color: active ? const Color(0xFF159447) : const Color(0xFFC2410C),
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ),
-                      child: Text(improving ? 'Improving' : 'In Progress', style: TextStyle(
-                        color: improving ? const Color(0xFF159447) : const Color(0xFF2775CA),
-                        fontSize: 8.5, fontWeight: FontWeight.w800,
-                      )),
-                    ),
-                  ]),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -631,85 +1105,153 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
     );
   }
 
+  // ============================================================
+  // INSIGHT CARD
+  // ============================================================
   Widget _buildInsightCard() {
-    final total = _todayPatientsCount;
-    final completed = _completedThisWeek;
+    final total = _totalPatientsCount;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [kLightCyan, Colors.white], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        gradient: const LinearGradient(
+          colors: [kLightCyan, Colors.white],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: kPrimaryCyan.withValues(alpha: .10)),
       ),
-      child: Row(children: [
-        Container(
-          width: 46, height: 46,
-          decoration: const BoxDecoration(color: kDarkCyan, shape: BoxShape.circle),
-          child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 22),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('TODAY\'S INSIGHT', style: TextStyle(color: kDarkCyan, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: .6)),
-          const SizedBox(height: 5),
-          Text(total == 0 ? 'Your dashboard is ready for today.' : '$completed of $total scheduled sessions are completed.', style: const TextStyle(
-            color: kTextPrimary, fontSize: 11, fontWeight: FontWeight.w700,
-          )),
-          const SizedBox(height: 5),
-          const Text('Keep your practice moving forward. ✨', style: TextStyle(
-            color: kDarkCyan, fontSize: 10.5, fontWeight: FontWeight.w700,
-          )),
-        ])),
-      ]),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: const BoxDecoration(color: kDarkCyan, shape: BoxShape.circle),
+            child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'TODAY\'S INSIGHT',
+                  style: TextStyle(
+                    color: kDarkCyan,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .6,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  total == 0
+                      ? 'Your clinic workspace is ready for your patients.'
+                      : '$total active patient${total == 1 ? '' : 's'} managed in your digital practice.',
+                  style: const TextStyle(
+                    color: kTextPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  'Keep your practice moving forward. ✨',
+                  style: TextStyle(
+                    color: kDarkCyan,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
+  // ============================================================
+  // SKELETON & ERROR STATES
+  // ============================================================
   Widget _buildLoadingState() {
-    return Column(children: [
-      const _SkeletonCard(height: 150),
-      const SizedBox(height: 12),
-      const _SkeletonCard(height: 180),
-      const SizedBox(height: 12),
-      const _SkeletonCard(height: 230),
-      const SizedBox(height: 12),
-      const _SkeletonCard(height: 150),
-    ]);
+    return const Column(
+      children: [
+        _SkeletonCard(height: 150),
+        SizedBox(height: 12),
+        _SkeletonCard(height: 180),
+        SizedBox(height: 12),
+        _SkeletonCard(height: 230),
+        SizedBox(height: 12),
+        _SkeletonCard(height: 150),
+      ],
+    );
   }
 
   Widget _buildErrorState() {
     return _card(
       padding: const EdgeInsets.all(24),
-      child: Column(children: [
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: const Color(0xFFFFF0F0), borderRadius: BorderRadius.circular(16)),
-          child: const Icon(Icons.cloud_off_rounded, color: kError, size: 32),
-        ),
-        const SizedBox(height: 12),
-        const Text('Could not load dashboard', style: TextStyle(color: kTextPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 6),
-        Text(_errorMessage ?? 'Something went wrong. Please try again.', textAlign: TextAlign.center, style: const TextStyle(color: kTextSecondary, fontSize: 13)),
-        const SizedBox(height: 14),
-        FilledButton.icon(
-          onPressed: _loadDashboardData,
-          style: FilledButton.styleFrom(backgroundColor: kPrimaryCyan),
-          icon: const Icon(Icons.refresh_rounded), label: const Text('Try again'),
-        ),
-      ]),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF0F0),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.cloud_off_rounded, color: kError, size: 32),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Could not load dashboard',
+            style: TextStyle(color: kTextPrimary, fontSize: 16, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _errorMessage ?? 'Something went wrong. Please try again.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: kTextSecondary, fontSize: 13),
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: _loadDashboardData,
+            style: FilledButton.styleFrom(backgroundColor: kPrimaryCyan),
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Try again'),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _sectionHeader(String title, String action, VoidCallback onTap) {
-    return Row(children: [
-      Expanded(child: Text(title, style: const TextStyle(color: kTextPrimary, fontSize: 17, fontWeight: FontWeight.w800))),
-      TextButton(
-        onPressed: onTap,
-        style: TextButton.styleFrom(foregroundColor: kPrimaryCyan, padding: const EdgeInsets.symmetric(horizontal: 6), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(action, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-          const SizedBox(width: 3), const Icon(Icons.arrow_forward_rounded, size: 15),
-        ]),
-      ),
-    ]);
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(color: kTextPrimary, fontSize: 17, fontWeight: FontWeight.w800),
+          ),
+        ),
+        TextButton(
+          onPressed: onTap,
+          style: TextButton.styleFrom(
+            foregroundColor: kPrimaryCyan,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(action, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+              const SizedBox(width: 3),
+              const Icon(Icons.arrow_forward_rounded, size: 15),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _card({required Widget child, EdgeInsetsGeometry padding = const EdgeInsets.all(16)}) {
@@ -720,26 +1262,36 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
         color: kCardBackground,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: kBorder),
-        boxShadow: [BoxShadow(color: const Color(0xFF123047).withValues(alpha: .045), blurRadius: 16, offset: const Offset(0, 5))],
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF123047).withValues(alpha: .045),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          )
+        ],
       ),
       child: child,
     );
   }
 
-  Widget _numberMetric(String value, String label) => Column(children: [
-    Text(value, style: const TextStyle(color: kTextPrimary, fontSize: 22, fontWeight: FontWeight.w800)),
-    const SizedBox(height: 3),
-    Text(label, textAlign: TextAlign.center, style: const TextStyle(color: kTextSecondary, fontSize: 10.5, fontWeight: FontWeight.w600)),
-  ]);
+  Widget _numberMetric(String value, String label) => Column(
+        children: [
+          Text(value, style: const TextStyle(color: kTextPrimary, fontSize: 22, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 3),
+          Text(label, textAlign: TextAlign.center, style: const TextStyle(color: kTextSecondary, fontSize: 10.5, fontWeight: FontWeight.w600)),
+        ],
+      );
 
   Widget _divider() => Container(width: 1, height: 34, color: kBorder);
 
-  Widget _legend(Color color, String title, String value) => Row(children: [
-    Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-    const SizedBox(width: 8),
-    Expanded(child: Text(title, style: const TextStyle(color: kTextSecondary, fontSize: 10.5, fontWeight: FontWeight.w600))),
-    Text(value, style: const TextStyle(color: kTextPrimary, fontSize: 11, fontWeight: FontWeight.w800)),
-  ]);
+  Widget _legend(Color color, String title, String value) => Row(
+        children: [
+          Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(title, style: const TextStyle(color: kTextSecondary, fontSize: 10.5, fontWeight: FontWeight.w600))),
+          Text(value, style: const TextStyle(color: kTextPrimary, fontSize: 11, fontWeight: FontWeight.w800)),
+        ],
+      );
 
   NavigationBar _buildBottomNavigationBar() {
     return NavigationBar(
@@ -751,11 +1303,31 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
       indicatorColor: kLightCyan,
       labelTextStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
       destinations: const [
-        NavigationDestination(icon: Icon(Icons.home_outlined, color: kTextSecondary), selectedIcon: Icon(Icons.home_rounded, color: kPrimaryCyan), label: 'Home'),
-        NavigationDestination(icon: Icon(Icons.people_outline_rounded, color: kTextSecondary), selectedIcon: Icon(Icons.people_rounded, color: kPrimaryCyan), label: 'Patients'),
-        NavigationDestination(icon: Icon(Icons.calendar_today_outlined, color: kTextSecondary), selectedIcon: Icon(Icons.calendar_today_rounded, color: kPrimaryCyan), label: 'Calendar'),
-        NavigationDestination(icon: Icon(Icons.insights_outlined, color: kTextSecondary), selectedIcon: Icon(Icons.insights_rounded, color: kPrimaryCyan), label: 'Analytics'),
-        NavigationDestination(icon: Icon(Icons.person_outline_rounded, color: kTextSecondary), selectedIcon: Icon(Icons.person_rounded, color: kPrimaryCyan), label: 'Profile'),
+        NavigationDestination(
+          icon: Icon(Icons.home_outlined, color: kTextSecondary),
+          selectedIcon: Icon(Icons.home_rounded, color: kPrimaryCyan),
+          label: 'Home',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.people_outline_rounded, color: kTextSecondary),
+          selectedIcon: Icon(Icons.people_rounded, color: kPrimaryCyan),
+          label: 'Patients',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.calendar_today_outlined, color: kTextSecondary),
+          selectedIcon: Icon(Icons.calendar_today_rounded, color: kPrimaryCyan),
+          label: 'Calendar',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.insights_outlined, color: kTextSecondary),
+          selectedIcon: Icon(Icons.insights_rounded, color: kPrimaryCyan),
+          label: 'Analytics',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.person_outline_rounded, color: kTextSecondary),
+          selectedIcon: Icon(Icons.person_rounded, color: kPrimaryCyan),
+          label: 'Profile',
+        ),
       ],
     );
   }
@@ -781,7 +1353,9 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
 
   void _navigateTo(Widget screen) async {
     await PhysioNavigation.push(context, screen);
-    if (mounted) setState(() => _selectedIndex = 0);
+    if (mounted) {
+      _loadDashboardData();
+    }
   }
 
   String _getInitials(String name) {
@@ -801,67 +1375,108 @@ class _PhysioDashboardState extends State<PhysioDashboard> {
 
 class _ScheduleRow extends StatelessWidget {
   const _ScheduleRow({
-    required this.patient,
-    required this.time,
-    required this.status,
+    required this.appointment,
     required this.isFirst,
     required this.isLast,
     required this.onTap,
   });
 
-  final DashboardPatient patient;
-  final String time;
-  final String status;
+  final AppointmentModel appointment;
   final bool isFirst;
   final bool isLast;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final completed = status == 'Completed';
-    final starting = status == 'Starting Soon';
-    final color = completed ? kSuccess : starting ? kPrimaryCyan : kTextSecondary;
+    final status = appointment.status.toUpperCase();
+    final isCompleted = status == 'COMPLETED';
+    final color = isCompleted ? kSuccess : kPrimaryCyan;
+    final name = (appointment.patientName != null && appointment.patientName!.isNotEmpty)
+        ? appointment.patientName!
+        : 'Patient';
+    final condition = (appointment.patientCondition != null && appointment.patientCondition!.isNotEmpty)
+        ? appointment.patientCondition!
+        : 'Physiotherapy';
 
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
-        child: Row(children: [
-          SizedBox(width: 48, child: Text(time, textAlign: TextAlign.center, style: const TextStyle(color: kTextSecondary, fontSize: 10, fontWeight: FontWeight.w700))),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 20, height: 54,
-            child: Stack(alignment: Alignment.center, children: [
-              if (!isFirst) Positioned(top: 0, bottom: 27, child: Container(width: 1.2, color: kBorder)),
-              if (!isLast) Positioned(top: 27, bottom: 0, child: Container(width: 1.2, color: kBorder)),
-              Container(
-                width: 18, height: 18,
-                decoration: BoxDecoration(color: completed ? kSuccess : Colors.white, shape: BoxShape.circle, border: Border.all(color: color, width: 2)),
-                child: completed ? const Icon(Icons.check, color: Colors.white, size: 11) : null,
+        child: Row(
+          children: [
+            SizedBox(
+              width: 58,
+              child: Text(
+                appointment.startTime,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: kTextSecondary, fontSize: 10, fontWeight: FontWeight.w700),
               ),
-            ]),
-          ),
-          const SizedBox(width: 8),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(patient.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextPrimary, fontSize: 12.5, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 3),
-            Text(patient.condition, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSecondary, fontSize: 10.5)),
-          ])),
-          const SizedBox(width: 5),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-            decoration: BoxDecoration(color: color.withValues(alpha: .09), borderRadius: BorderRadius.circular(9)),
-            child: Text(status, style: TextStyle(color: color, fontSize: 8.3, fontWeight: FontWeight.w800)),
-          ),
-          const Icon(Icons.chevron_right_rounded, color: kTextSecondary, size: 18),
-        ]),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 20,
+              height: 54,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  if (!isFirst) Positioned(top: 0, bottom: 27, child: Container(width: 1.2, color: kBorder)),
+                  if (!isLast) Positioned(top: 27, bottom: 0, child: Container(width: 1.2, color: kBorder)),
+                  Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: isCompleted ? kSuccess : Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: color, width: 2),
+                    ),
+                    child: isCompleted ? const Icon(Icons.check, color: Colors.white, size: 11) : null,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: kTextPrimary, fontSize: 12.5, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    condition,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: kTextSecondary, fontSize: 10.5),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 5),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+              decoration: BoxDecoration(color: color.withValues(alpha: .09), borderRadius: BorderRadius.circular(9)),
+              child: Text(appointment.status, style: TextStyle(color: color, fontSize: 8.3, fontWeight: FontWeight.w800)),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: kTextSecondary, size: 18),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _WatchlistRow extends StatelessWidget {
-  const _WatchlistRow({required this.patient, required this.color, required this.message, required this.onTap});
+  const _WatchlistRow({
+    required this.patient,
+    required this.color,
+    required this.message,
+    required this.onTap,
+  });
+
   final DashboardPatient patient;
   final Color color;
   final String message;
@@ -873,18 +1488,46 @@ class _WatchlistRow extends StatelessWidget {
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(children: [
-          Container(width: 4, height: 45, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8))),
-          const SizedBox(width: 10),
-          CircleAvatar(radius: 19, backgroundColor: color.withValues(alpha: .10), child: Text(patient.initials, style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w800))),
-          const SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(patient.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextPrimary, fontSize: 12, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 3),
-            Text(message, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: kTextSecondary, fontSize: 10)),
-          ])),
-          const Icon(Icons.chevron_right_rounded, color: kTextSecondary, size: 19),
-        ]),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 45,
+              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
+            ),
+            const SizedBox(width: 10),
+            CircleAvatar(
+              radius: 19,
+              backgroundColor: color.withValues(alpha: .10),
+              child: Text(
+                patient.initials,
+                style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w800),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    patient.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: kTextPrimary, fontSize: 12, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    message,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: kTextSecondary, fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: kTextSecondary, size: 19),
+          ],
+        ),
       ),
     );
   }
@@ -900,14 +1543,21 @@ class _SkeletonCard extends StatelessWidget {
       height: height,
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: kBorder)),
-      child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _SkeletonLine(width: 130, height: 13),
-        SizedBox(height: 14),
-        _SkeletonLine(width: double.infinity, height: 28),
-        SizedBox(height: 9),
-        _SkeletonLine(width: 210, height: 12),
-      ]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kBorder),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SkeletonLine(width: 130, height: 13),
+          SizedBox(height: 14),
+          _SkeletonLine(width: double.infinity, height: 28),
+          SizedBox(height: 9),
+          _SkeletonLine(width: 210, height: 12),
+        ],
+      ),
     );
   }
 }
@@ -919,7 +1569,11 @@ class _SkeletonLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(width: width, height: height, decoration: BoxDecoration(color: kLightCyan, borderRadius: BorderRadius.circular(8)));
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(color: kLightCyan, borderRadius: BorderRadius.circular(8)),
+    );
   }
 }
 
@@ -955,7 +1609,11 @@ class MoreScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('More Options'), backgroundColor: kPrimaryCyan, foregroundColor: Colors.white),
+      appBar: AppBar(
+        title: const Text('More Options'),
+        backgroundColor: kPrimaryCyan,
+        foregroundColor: Colors.white,
+      ),
       body: const Center(child: Text('Clinic Settings & Reports')),
     );
   }

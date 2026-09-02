@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/app_update_info.dart';
 import '../../services/auth_service.dart';
+import '../../services/patient_service.dart';
 import '../../services/update_service.dart';
 import '../../widgets/update_dialog.dart';
 import '../auth/login_screen.dart';
@@ -29,15 +30,17 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   int _navIndex = 4;
 
-  String _doctorName = 'Dr. Arjun Kapoor';
-  String _email = 'dr.arjun@rehabz.com';
-  String _phone = '+91 99887 76655';
-  String _initials = 'DA';
+  String _doctorName = 'Physiotherapist';
+  String _email = '';
+  String _phone = '';
+  String _initials = 'PT';
+  int _patientCount = 0;
+  int _sessionCount = 0;
 
   final String _specialty = 'Sports & Orthopedic Physiotherapy';
   final String _clinicName = 'RehabZ Clinic';
-  final String _location = 'Bandra West, Mumbai';
-  final String _experience = '8 years';
+  final String _location = 'Physical Rehabilitation';
+  final String _experience = '5+ years';
   final String _consultationFee = '₹500 (online) · ₹800 (in-person)';
 
   // Update check state
@@ -134,6 +137,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadUserProfile() async {
     try {
       final user = await AuthService().getProfile();
+      final patients = await PatientService().getPatients();
+      int totalSessions = 0;
+      for (final p in patients) {
+        totalSessions += p.sessionNotes.length;
+      }
       if (!mounted) return;
       setState(() {
         if (user.fullName.isNotEmpty) {
@@ -141,9 +149,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ? user.fullName
               : 'Dr. ${user.fullName}';
           _initials = _getInitials(user.fullName);
+        } else if (user.firstName.isNotEmpty) {
+          _doctorName = 'Dr. ${user.firstName}';
+          _initials = _getInitials(user.firstName);
+        } else {
+          _doctorName = 'Physiotherapist';
+          _initials = 'PT';
         }
         if (user.email.isNotEmpty) _email = user.email;
         if (user.phone != null && user.phone!.isNotEmpty) _phone = user.phone!;
+        _patientCount = patients.length;
+        _sessionCount = totalSessions;
       });
     } catch (_) {}
   }
@@ -375,11 +391,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return _card(
       child: Row(
         children: [
-          Expanded(child: _stat('5+', 'Patients', Icons.people_outline)),
+          Expanded(child: _stat('$_patientCount', 'Patients', Icons.people_outline)),
           _verticalDivider(),
-          Expanded(child: _stat('47', 'Sessions', Icons.calendar_month_outlined)),
+          Expanded(child: _stat('$_sessionCount', 'Sessions', Icons.calendar_month_outlined)),
           _verticalDivider(),
-          Expanded(child: _stat('4.9', 'Rating', Icons.star_outline_rounded)),
+          Expanded(child: _stat(_patientCount > 0 ? '5.0' : '—', 'Rating', Icons.star_outline_rounded)),
         ],
       ),
     );

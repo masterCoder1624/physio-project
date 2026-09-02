@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../models/patient_model.dart';
 import '../../services/patient_service.dart';
 import 'add_patient_screen.dart';
 import 'calendar_screen.dart';
@@ -8,7 +9,7 @@ import 'profile_screen.dart';
 import 'physio_navigation.dart';
 import 'dart:async';
 
-// Physio Patients UI theme. Backend/API code is intentionally untouched.
+// Physio Patients UI theme — preserved exactly.
 const Color _kPrimaryCyan = Color(0xFF00AFC1);
 const Color _kDarkCyan = Color(0xFF008C9E);
 const Color _kLightCyan = Color(0xFFE8F9FB);
@@ -64,17 +65,35 @@ class _PatientListScreenState extends State<PatientListScreen> {
       if (!mounted) return;
 
       final patients = models.map((m) {
+        String formattedDate = '—';
+        if (m.createdAt != null && m.createdAt!.isNotEmpty) {
+          final dt = DateTime.tryParse(m.createdAt!);
+          if (dt != null) {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            formattedDate = '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+          } else {
+            formattedDate = m.createdAt!.length >= 10 ? m.createdAt!.substring(0, 10) : m.createdAt!;
+          }
+        }
+
+        String genderDisplay = '—';
+        if (m.gender != null && m.gender!.isNotEmpty) {
+          final g = m.gender!.trim().toLowerCase();
+          genderDisplay = g.length > 1 ? '${g[0].toUpperCase()}${g.substring(1)}' : g.toUpperCase();
+        }
+
+        String ageDisplay = m.age.isNotEmpty ? (m.age.endsWith('yrs') ? m.age : '${m.age} yrs') : '—';
+
         return _PatientItem(
           id: m.id ?? '',
-          name: m.name,
-          condition: m.condition.isNotEmpty
-              ? m.condition
-              : 'Physical Rehabilitation',
+          name: m.name.isNotEmpty ? m.name : 'Patient',
+          condition: m.condition.isNotEmpty ? m.condition : 'Physical Rehabilitation',
           status: m.status.toUpperCase(),
-          age: m.age,
-          gender: m.gender ?? 'Not specified',
-          lastVisit: '2026-07-20',
-          phone: m.phone ?? '+91 98765 43210',
+          age: ageDisplay,
+          rawAge: m.age,
+          gender: genderDisplay,
+          lastVisit: formattedDate,
+          phone: m.phone != null && m.phone!.isNotEmpty ? m.phone! : '—',
           createdAt: m.createdAt,
           initials: _getInitials(m.name),
           avatarBgColor: _kPrimaryCyan,
@@ -128,7 +147,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
         a.name.toLowerCase().compareTo(b.name.toLowerCase());
 
     int compareAge(_PatientItem a, _PatientItem b) =>
-        (int.tryParse(a.age) ?? 0).compareTo(int.tryParse(b.age) ?? 0);
+        (int.tryParse(a.rawAge) ?? 0).compareTo(int.tryParse(b.rawAge) ?? 0);
 
     DateTime? createdDate(_PatientItem patient) => patient.createdAt == null
         ? null
@@ -164,6 +183,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
   String _getInitials(String name) {
     final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) return 'PT';
     if (parts.length == 1) {
       final value = parts.first;
       return value.substring(0, value.length > 1 ? 2 : 1).toUpperCase();
@@ -177,67 +197,80 @@ class _PatientListScreenState extends State<PatientListScreen> {
       statusBarColor: Colors.white,
       statusBarBrightness: Brightness.light,
       child: Scaffold(
-      backgroundColor: _kPageBg,
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: _kPrimaryCyan,
-          onRefresh: _fetchPatients,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    _buildHeader(),
-                    const SizedBox(height: 18),
-                    _buildSearchBar(),
-                    const SizedBox(height: 14),
-                    _buildFilterBar(),
-                    const SizedBox(height: 18),
-                    _buildListHeader(),
-                    const SizedBox(height: 10),
-                  ]),
-                ),
-              ),
-              if (_isLoading)
-                const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _LoadingState(),
-                )
-              else if (_filteredPatients.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _EmptyState(onAddPatient: _openAddPatient),
-                )
-              else
+        backgroundColor: _kPageBg,
+        body: SafeArea(
+          child: RefreshIndicator(
+            color: _kPrimaryCyan,
+            onRefresh: _fetchPatients,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                  sliver: SliverList.builder(
-                    itemCount: _filteredPatients.length,
-                    itemBuilder: (context, index) {
-                      return Padding(
-                        padding: EdgeInsets.only(
-                          bottom: index == _filteredPatients.length - 1 ? 0 : 12,
-                        ),
-                        child: _buildPatientCard(_filteredPatients[index]),
-                      );
-                    },
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      _buildHeader(),
+                      const SizedBox(height: 18),
+                      _buildSearchBar(),
+                      const SizedBox(height: 14),
+                      _buildFilterBar(),
+                      const SizedBox(height: 18),
+                      _buildListHeader(),
+                      const SizedBox(height: 10),
+                    ]),
                   ),
                 ),
-            ],
+                if (_isLoading)
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _LoadingState(),
+                  )
+                else if (_allPatients.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _ZeroPatientsEmptyState(onAddPatient: _openAddPatient),
+                  )
+                else if (_filteredPatients.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _NoSearchResultsEmptyState(
+                      onResetSearch: () {
+                        _searchController.clear();
+                        setState(() {
+                          _selectedFilter = 'All';
+                          _filteredPatients = _allPatients;
+                        });
+                      },
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                    sliver: SliverList.builder(
+                      itemCount: _filteredPatients.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            bottom: index == _filteredPatients.length - 1 ? 0 : 12,
+                          ),
+                          child: _buildPatientCard(_filteredPatients[index]),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
+        bottomNavigationBar: widget.showBottomNavigation ? _buildBottomNavigationBar() : null,
+        floatingActionButton: FloatingActionButton(
+          onPressed: _openAddPatient,
+          backgroundColor: _kPrimaryCyan,
+          foregroundColor: Colors.white,
+          elevation: 4,
+          child: const Icon(Icons.add_rounded, size: 28),
+        ),
       ),
-      bottomNavigationBar: widget.showBottomNavigation ? _buildBottomNavigationBar() : null,
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openAddPatient,
-        backgroundColor: _kPrimaryCyan,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        child: const Icon(Icons.add_rounded, size: 28),
-      ),
-    ),
     );
   }
 
@@ -245,11 +278,11 @@ class _PatientListScreenState extends State<PatientListScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Expanded(
+        const Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Patients',
                 style: TextStyle(
                   fontSize: 28,
@@ -258,7 +291,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                   letterSpacing: -0.6,
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               Text(
                 'Manage your patients',
                 style: TextStyle(
@@ -342,6 +375,17 @@ class _PatientListScreenState extends State<PatientListScreen> {
       child: Row(
         children: filters.map((filter) {
           final selected = _selectedFilter == filter;
+          int count = 0;
+          if (filter == 'All') {
+            count = _allPatients.length;
+          } else if (filter == 'Active') {
+            count = _allPatients.where((p) => p.status == 'ACTIVE').length;
+          } else if (filter == 'Pending') {
+            count = _allPatients.where((p) => p.status == 'PENDING').length;
+          } else if (filter == 'Completed') {
+            count = _allPatients.where((p) => p.status == 'COMPLETED').length;
+          }
+
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: InkWell(
@@ -355,8 +399,8 @@ class _PatientListScreenState extends State<PatientListScreen> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 17,
-                  vertical: 9,
+                  horizontal: 15,
+                  vertical: 8,
                 ),
                 decoration: BoxDecoration(
                   color: selected ? _kPrimaryCyan : _kCardBg,
@@ -365,13 +409,36 @@ class _PatientListScreenState extends State<PatientListScreen> {
                     color: selected ? _kPrimaryCyan : _kBorderColor,
                   ),
                 ),
-                child: Text(
-                  filter,
-                  style: TextStyle(
-                    color: selected ? Colors.white : _kTextSecondary,
-                    fontSize: 13,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      filter,
+                      style: TextStyle(
+                        color: selected ? Colors.white : _kTextSecondary,
+                        fontSize: 13,
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                      ),
+                    ),
+                    if (count > 0) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: selected ? Colors.white.withValues(alpha: 0.25) : _kLightCyan,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: TextStyle(
+                            color: selected ? Colors.white : _kDarkCyan,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
@@ -534,7 +601,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                   _verticalDivider(),
                   Expanded(child: _cardInfo(Icons.wc_rounded, patient.gender, 'Gender')),
                   _verticalDivider(),
-                  Expanded(child: _cardInfo(Icons.calendar_today_outlined, patient.lastVisit, 'Last Visit')),
+                  Expanded(child: _cardInfo(Icons.calendar_today_outlined, patient.lastVisit, 'Added on')),
                 ],
               ),
             ),
@@ -570,6 +637,9 @@ class _PatientListScreenState extends State<PatientListScreen> {
     );
   }
 
+  // ============================================================
+  // THREE-DOT ACTION MENU (View, Edit, Change Status, Delete)
+  // ============================================================
   Widget _buildPatientMenu(_PatientItem patient) {
     return PopupMenuButton<String>(
       tooltip: 'Patient actions',
@@ -581,14 +651,19 @@ class _PatientListScreenState extends State<PatientListScreen> {
       onSelected: (value) => _handlePatientAction(value, patient),
       itemBuilder: (context) => [
         _patientMenuItem(
+          value: 'view',
+          icon: Icons.person_outline_rounded,
+          label: 'View Profile',
+        ),
+        _patientMenuItem(
           value: 'edit',
           icon: Icons.edit_outlined,
           label: 'Edit Patient',
         ),
         _patientMenuItem(
-          value: 'note',
-          icon: Icons.note_add_outlined,
-          label: 'Add Note',
+          value: 'status',
+          icon: Icons.swap_horiz_rounded,
+          label: 'Change Status',
         ),
         const PopupMenuDivider(height: 8),
         _patientMenuItem(
@@ -623,7 +698,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
   }) {
     return PopupMenuItem<String>(
       value: value,
-      height: 46,
+      height: 44,
       child: Row(
         children: [
           Icon(
@@ -647,14 +722,14 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
   void _handlePatientAction(String action, _PatientItem patient) {
     switch (action) {
-      case 'note':
-        _openPatient(patient.id, 1);
+      case 'view':
+        _openPatient(patient.id, 0);
         break;
       case 'edit':
-        _showFrontendActionMessage(
-          'Edit Patient',
-          'The edit screen is not connected yet, so no patient data was changed.',
-        );
+        _showEditPatientBottomSheet(patient);
+        break;
+      case 'status':
+        _showChangeStatusBottomSheet(patient);
         break;
       case 'delete':
         _showDeleteConfirmation(patient);
@@ -662,44 +737,337 @@ class _PatientListScreenState extends State<PatientListScreen> {
     }
   }
 
-  void _showFrontendActionMessage(String title, String message) {
-    showDialog<void>(
+  // ============================================================
+  // STATUS CHANGE BOTTOM SHEET
+  // ============================================================
+  void _showChangeStatusBottomSheet(_PatientItem patient) {
+    String currentStatus = patient.status.toUpperCase();
+    String selectedStatus = currentStatus;
+
+    showModalBottomSheet<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text(
-          title,
-          style: const TextStyle(
-            color: _kTextDark,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Change Patient Status',
+                          style: TextStyle(
+                            color: _kTextDark,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: _kTextMuted),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'Select current treatment status for ${patient.name}',
+                      style: const TextStyle(color: _kTextSecondary, fontSize: 13),
+                    ),
+                    const SizedBox(height: 18),
+                    _statusOptionTile(
+                      label: 'Active',
+                      value: 'ACTIVE',
+                      subtitle: 'Currently undergoing active therapy',
+                      bg: const Color(0xFFEAF9F0),
+                      fg: const Color(0xFF159447),
+                      selected: selectedStatus == 'ACTIVE',
+                      onTap: () => setSheetState(() => selectedStatus = 'ACTIVE'),
+                    ),
+                    const SizedBox(height: 10),
+                    _statusOptionTile(
+                      label: 'Pending',
+                      value: 'PENDING',
+                      subtitle: 'Awaiting assessment or scheduled to start',
+                      bg: const Color(0xFFFFF7ED),
+                      fg: const Color(0xFFC2410C),
+                      selected: selectedStatus == 'PENDING',
+                      onTap: () => setSheetState(() => selectedStatus = 'PENDING'),
+                    ),
+                    const SizedBox(height: 10),
+                    _statusOptionTile(
+                      label: 'Completed',
+                      value: 'COMPLETED',
+                      subtitle: 'Treatment protocol finished successfully',
+                      bg: const Color(0xFFE8F9FB),
+                      fg: const Color(0xFF008C9E),
+                      selected: selectedStatus == 'COMPLETED',
+                      onTap: () => setSheetState(() => selectedStatus = 'COMPLETED'),
+                    ),
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          Navigator.pop(ctx);
+                          await _patientService.updatePatientStatus(patient.id, selectedStatus);
+                          if (!mounted) return;
+                          _fetchPatients();
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Patient status updated successfully.'),
+                              backgroundColor: Color(0xFF159447),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _kPrimaryCyan,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'Save Changes',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _statusOptionTile({
+    required String label,
+    required String value,
+    required String subtitle,
+    required Color bg,
+    required Color fg,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? bg : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? fg : _kBorderColor,
+            width: selected ? 1.8 : 1,
           ),
         ),
-        content: Text(
-          message,
-          style: const TextStyle(color: _kTextSecondary, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'OK',
-              style: TextStyle(
-                color: _kPrimaryCyan,
-                fontWeight: FontWeight.w700,
+        child: Row(
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected ? fg : _kTextMuted,
+                  width: selected ? 6 : 1.5,
+                ),
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: selected ? fg : _kTextDark,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: _kTextSecondary, fontSize: 11.5),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
+  // ============================================================
+  // EDIT PATIENT BOTTOM SHEET
+  // ============================================================
+  void _showEditPatientBottomSheet(_PatientItem patient) {
+    final nameCtrl = TextEditingController(text: patient.name);
+    final conditionCtrl = TextEditingController(text: patient.condition);
+    final phoneCtrl = TextEditingController(text: patient.phone == '—' ? '' : patient.phone);
+    final ageCtrl = TextEditingController(text: patient.rawAge);
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Edit Patient',
+                    style: TextStyle(
+                      color: _kTextDark,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: _kTextMuted),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Full Name',
+                  filled: true,
+                  fillColor: _kPageBg,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: _kBorderColor),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: conditionCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Primary Condition / Injury',
+                  filled: true,
+                  fillColor: _kPageBg,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: _kBorderColor),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: ageCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Age',
+                        filled: true,
+                        fillColor: _kPageBg,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: _kBorderColor),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: phoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: 'Phone',
+                        filled: true,
+                        fillColor: _kPageBg,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: _kBorderColor),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    Navigator.pop(ctx);
+                    final updatedModel = PatientModel(
+                      id: patient.id,
+                      name: nameCtrl.text.trim(),
+                      condition: conditionCtrl.text.trim(),
+                      age: ageCtrl.text.trim(),
+                      phone: phoneCtrl.text.trim(),
+                      status: patient.status,
+                    );
+                    await _patientService.updatePatient(updatedModel);
+                    if (!mounted) return;
+                    _fetchPatients();
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('Patient updated successfully.')),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _kPrimaryCyan,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // DELETION CONFIRMATION DIALOG
+  // ============================================================
   Future<void> _showDeleteConfirmation(_PatientItem patient) async {
     await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text(
@@ -711,30 +1079,41 @@ class _PatientListScreenState extends State<PatientListScreen> {
           ),
         ),
         content: Text(
-          'Delete ${patient.name}? The current frontend does not have a connected delete operation, so no data will be removed.',
+          'Are you sure you want to delete ${patient.name}?\nThis action cannot be undone.',
           style: const TextStyle(color: _kTextSecondary, height: 1.4),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text(
               'Cancel',
-              style: TextStyle(color: _kTextSecondary),
+              style: TextStyle(color: _kTextSecondary, fontWeight: FontWeight.w600),
             ),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _showFrontendActionMessage(
-                'Delete Patient',
-                'Delete is not connected yet. No patient data was removed.',
-              );
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(ctx);
+              final success = await _patientService.deletePatient(patient.id);
+              if (!mounted) return;
+              if (success) {
+                setState(() {
+                  _allPatients.removeWhere((p) => p.id == patient.id);
+                  _filteredPatients = _filterPatients(_allPatients);
+                });
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Patient deleted successfully.'),
+                    backgroundColor: Color(0xFFDC2626),
+                  ),
+                );
+              }
             },
             child: const Text(
               'Delete',
               style: TextStyle(
                 color: Color(0xFFDC2626),
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -906,20 +1285,20 @@ class _PatientListScreenState extends State<PatientListScreen> {
       case 'ACTIVE':
         return const _StatusStyle(
           'Active',
-          Color(0xFFE7F8EF),
+          Color(0xFFEAF9F0),
           Color(0xFF159447),
         );
       case 'PENDING':
         return const _StatusStyle(
           'Pending',
-          Color(0xFFFFF4DF),
-          Color(0xFFD97706),
+          Color(0xFFFFF7ED),
+          Color(0xFFC2410C),
         );
       case 'COMPLETED':
         return const _StatusStyle(
           'Completed',
-          Color(0xFFE6F7F6),
-          Color(0xFF008C78),
+          Color(0xFFE8F9FB),
+          Color(0xFF008C9E),
         );
       case 'NEED FOLLOWUP':
         return const _StatusStyle(
@@ -929,9 +1308,9 @@ class _PatientListScreenState extends State<PatientListScreen> {
         );
       default:
         return const _StatusStyle(
-          'Patient',
-          Color(0xFFF1F5F9),
-          _kTextSecondary,
+          'Active',
+          Color(0xFFEAF9F0),
+          Color(0xFF159447),
         );
     }
   }
@@ -1059,10 +1438,10 @@ class _LoadingState extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
+class _ZeroPatientsEmptyState extends StatelessWidget {
   final VoidCallback onAddPatient;
 
-  const _EmptyState({required this.onAddPatient});
+  const _ZeroPatientsEmptyState({required this.onAddPatient});
 
   @override
   Widget build(BuildContext context) {
@@ -1086,36 +1465,89 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             const Text(
-              'No patients found',
+              'No patients yet',
               style: TextStyle(
                 color: _kTextDark,
-                fontSize: 17,
+                fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 6),
             const Text(
-              'Try another search or add your first patient.',
+              'Start building your patient list by adding your first patient.',
               textAlign: TextAlign.center,
               style: TextStyle(color: _kTextSecondary, fontSize: 13),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: onAddPatient,
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Add Patient'),
+              icon: const Icon(Icons.add_rounded, size: 19),
+              label: const Text('+ Add Patient'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _kPrimaryCyan,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 11,
+                  horizontal: 22,
+                  vertical: 12,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(11),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                textStyle: const TextStyle(fontWeight: FontWeight.w700),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoSearchResultsEmptyState extends StatelessWidget {
+  final VoidCallback onResetSearch;
+
+  const _NoSearchResultsEmptyState({required this.onResetSearch});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: const BoxDecoration(
+                color: _kLightCyan,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.search_off_rounded,
+                size: 42,
+                color: _kPrimaryCyan,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No patients found',
+              style: TextStyle(
+                color: _kTextDark,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Try searching using a different name, ID, phone number or condition.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _kTextSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: onResetSearch,
+              child: const Text('Clear Search & Filters', style: TextStyle(color: _kPrimaryCyan, fontWeight: FontWeight.w700)),
             ),
           ],
         ),
@@ -1130,6 +1562,7 @@ class _PatientItem {
   final String condition;
   final String status;
   final String age;
+  final String rawAge;
   final String gender;
   final String lastVisit;
   final String phone;
@@ -1143,6 +1576,7 @@ class _PatientItem {
     required this.condition,
     required this.status,
     required this.age,
+    required this.rawAge,
     required this.gender,
     required this.lastVisit,
     required this.phone,

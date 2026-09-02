@@ -17,8 +17,8 @@ class PdfInvoiceService {
     required double amount,
     required double paidAmount,
     required double remainingAmount,
-    String doctorName = 'Dr. Ashutosh Sharma',
-    String clinicName = 'My Physio',
+    String doctorName = 'Physiotherapist',
+    String clinicName = 'RehabZ Clinic',
   }) async {
     final pdf = pw.Document();
 

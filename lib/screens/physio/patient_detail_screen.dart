@@ -454,10 +454,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen>
     final nextNum = patient.sessionNotes.length + 1;
     int pain = patient.assessment?.painLevel ?? 3;
 
-    final noteCtrl = TextEditingController(
-      text:
-          'Patient demonstrates full weight bearing. Flexion improved.',
-    );
+    final noteCtrl = TextEditingController();
 
     try {
       await showModalBottomSheet<void>(
