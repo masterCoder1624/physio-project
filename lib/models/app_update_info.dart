@@ -102,7 +102,9 @@ class AppUpdateInfo {
       }
     }
 
-    final hasNewerVersion = isNewer(cleanLatestVersion, cleanCurrentVersion);
+    final hasNewerVersion = cleanLatestVersion.isNotEmpty &&
+        cleanCurrentVersion.isNotEmpty &&
+        isNewer(cleanLatestVersion, cleanCurrentVersion);
     final isAvailable = hasNewerVersion && downloadUrl.isNotEmpty;
 
     return AppUpdateInfo(
@@ -126,11 +128,18 @@ class AppUpdateInfo {
     if (s.startsWith('v') || s.startsWith('V')) {
       s = s.substring(1).trim();
     }
-    // Remove pre-release tags or build numbers for base version extraction if attached via '-' or '+'
+    // Remove build numbers (+...) and pre-release identifiers (-...)
+    // so we compare strictly on major.minor.patch
+    if (s.contains('+')) {
+      s = s.split('+')[0].trim();
+    }
+    if (s.contains('-')) {
+      s = s.split('-')[0].trim();
+    }
     return s;
   }
 
-  /// Semantic Version Comparison:
+  /// Semantic Version Comparison strictly on major.minor.patch:
   /// Returns > 0 if v1 > v2
   /// Returns 0 if v1 == v2
   /// Returns < 0 if v1 < v2
@@ -140,15 +149,8 @@ class AppUpdateInfo {
 
     if (v1Clean == v2Clean) return 0;
 
-    // Split base version and build number (+N)
-    final v1PartsWithBuild = v1Clean.split('+');
-    final v2PartsWithBuild = v2Clean.split('+');
-
-    final v1Base = v1PartsWithBuild[0].split('-')[0];
-    final v2Base = v2PartsWithBuild[0].split('-')[0];
-
-    final v1Segments = v1Base.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-    final v2Segments = v2Base.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    final v1Segments = v1Clean.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    final v2Segments = v2Clean.split('.').map((e) => int.tryParse(e) ?? 0).toList();
 
     final maxLen = v1Segments.length > v2Segments.length ? v1Segments.length : v2Segments.length;
 
@@ -160,19 +162,14 @@ class AppUpdateInfo {
       if (seg1 < seg2) return -1;
     }
 
-    // If semantic base numbers are equal, check build number if available (+1, +2)
-    if (v1PartsWithBuild.length > 1 && v2PartsWithBuild.length > 1) {
-      final b1 = int.tryParse(v1PartsWithBuild[1]) ?? 0;
-      final b2 = int.tryParse(v2PartsWithBuild[1]) ?? 0;
-      if (b1 > b2) return 1;
-      if (b1 < b2) return -1;
-    }
-
     return 0;
   }
 
-  /// Helper to test if latest version is newer than current version
+  /// Helper to test if latest version is strictly newer than current version
   static bool isNewer(String latest, String current) {
-    return compareVersions(latest, current) > 0;
+    final cleanLatest = cleanVersionString(latest);
+    final cleanCurrent = cleanVersionString(current);
+    if (cleanLatest.isEmpty || cleanCurrent.isEmpty) return false;
+    return compareVersions(cleanLatest, cleanCurrent) > 0;
   }
 }
