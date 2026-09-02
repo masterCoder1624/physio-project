@@ -99,6 +99,56 @@ class UpdateService {
     }
   }
 
+  /// Manual update check that throws [UpdateException] on network or API errors,
+  /// allowing the caller to distinguish between "no update available" and "check failed".
+  /// Always bypasses the automatic cooldown.
+  Future<AppUpdateInfo?> checkForUpdateManual() async {
+    if (_isChecking) {
+      throw UpdateException('Update check already in progress.');
+    }
+
+    _isChecking = true;
+
+    try {
+      final currentVersion = await getCurrentVersion();
+      final uri = Uri.parse(AppConfig.latestReleaseApiUrl);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'RehabZ-App',
+        },
+      ).timeout(AppConfig.networkTimeout);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body) as Map<String, dynamic>;
+        final updateInfo = AppUpdateInfo.fromGitHubReleaseJson(
+          data,
+          currentVersion: currentVersion,
+          preferredApkName: AppConfig.defaultApkAssetName,
+        );
+        _cachedUpdateInfo = updateInfo;
+        await _recordCheckTimestamp();
+        return updateInfo;
+      } else if (response.statusCode == 404) {
+        return null;
+      } else if (response.statusCode == 403) {
+        throw UpdateException('GitHub API rate limit exceeded. Please try again later.');
+      } else {
+        throw UpdateException(
+            'GitHub returned an unexpected error (HTTP ${response.statusCode}).');
+      }
+    } on UpdateException {
+      rethrow;
+    } catch (_) {
+      throw UpdateException(
+          'Unable to check for updates. Please check your internet connection and try again.');
+    } finally {
+      _isChecking = false;
+    }
+  }
+
   /// Streams and downloads the APK file from GitHub release with live progress reporting.
   Future<File> downloadApk(
     String downloadUrl, {

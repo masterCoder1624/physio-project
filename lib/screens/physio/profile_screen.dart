@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../models/app_update_info.dart';
 import '../../services/auth_service.dart';
 import '../../services/update_service.dart';
+import '../../widgets/update_dialog.dart';
 import '../auth/login_screen.dart';
 import 'calendar_screen.dart';
 import 'patient_list_screen.dart';
@@ -38,10 +40,95 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final String _experience = '8 years';
   final String _consultationFee = '₹500 (online) · ₹800 (in-person)';
 
+  // Update check state
+  bool _isCheckingUpdate = false;
+
   @override
   void initState() {
     super.initState();
     _loadUserProfile();
+  }
+
+  // ============================================================
+  // MANUAL UPDATE CHECK — loading spinner, update dialog, or error
+  // ============================================================
+
+  Future<void> _checkForUpdates() async {
+    if (_isCheckingUpdate) return;
+
+    setState(() => _isCheckingUpdate = true);
+
+    try {
+      final AppUpdateInfo? updateInfo =
+          await UpdateService.instance.checkForUpdateManual();
+
+      if (!mounted) return;
+
+      if (updateInfo != null && updateInfo.isUpdateAvailable) {
+        showDialog(
+          context: context,
+          barrierDismissible: !updateInfo.isMandatory,
+          builder: (ctx) => UpdateDialog(
+            updateInfo: updateInfo,
+            onDismiss: () {},
+          ),
+        );
+      } else {
+        final version = await UpdateService.instance.getCurrentVersion();
+        if (!mounted) return;
+        _showSnackBar(
+          'You are using the latest version of RehabZ (v$version).',
+          icon: Icons.check_circle_outline_rounded,
+          color: const Color(0xFF10B981),
+        );
+      }
+    } on UpdateException catch (e) {
+      if (!mounted) return;
+      _showSnackBar(
+        e.message,
+        icon: Icons.error_outline_rounded,
+        color: const Color(0xFFEF4444),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar(
+        'Unable to check for updates. Please check your internet connection and try again.',
+        icon: Icons.error_outline_rounded,
+        color: const Color(0xFFEF4444),
+      );
+    } finally {
+      if (mounted) setState(() => _isCheckingUpdate = false);
+    }
+  }
+
+  void _showSnackBar(String message, {required IconData icon, required Color color}) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: Colors.white,
+        elevation: 4,
+        duration: const Duration(seconds: 4),
+        content: Row(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Color(0xFF123047),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadUserProfile() async {
@@ -407,7 +494,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           _setting(Icons.settings_outlined, 'Account Settings', () => _message('Account settings')),
           _setting(Icons.notifications_none_outlined, 'Notifications', () => _message('Notifications')),
-          _setting(Icons.system_update_rounded, 'Check for Updates', () => UpdateService.instance.checkAndPromptUpdate(context, isManual: true)),
+
+          // ── About & Updates ────────────────────────────────
+          const Divider(height: 1, color: _border, indent: 16, endIndent: 16),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 14, 16, 4),
+            child: Text(
+              'About & Updates',
+              style: TextStyle(color: _textMuted, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+            ),
+          ),
+
+          // App Version — dynamic via package_info_plus
+          FutureBuilder<String>(
+            future: UpdateService.instance.getCurrentVersion(),
+            builder: (context, snapshot) {
+              final version = snapshot.data ?? '—';
+              return ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                leading: const Icon(Icons.info_outline_rounded, color: _textMuted, size: 22),
+                title: const Text('App Version', style: TextStyle(color: _textDark, fontSize: 14, fontWeight: FontWeight.w600)),
+                trailing: snapshot.connectionState == ConnectionState.done
+                    ? Text('v$version', style: const TextStyle(color: _cyan, fontWeight: FontWeight.w700, fontSize: 13))
+                    : const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: _cyan)),
+              );
+            },
+          ),
+
+          // Check for Updates — loading-aware tile
+          ListTile(
+            onTap: _isCheckingUpdate ? null : _checkForUpdates,
+            dense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+            leading: Icon(
+              Icons.system_update_rounded,
+              color: _isCheckingUpdate ? _textMuted : _textMuted,
+              size: 22,
+            ),
+            title: Text(
+              _isCheckingUpdate ? 'Checking for updates...' : 'Check for Updates',
+              style: TextStyle(
+                color: _isCheckingUpdate ? _textMuted : _textDark,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            trailing: _isCheckingUpdate
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: _cyan),
+                  )
+                : const Icon(Icons.chevron_right, color: _textMuted, size: 20),
+          ),
+
+          const Divider(height: 1, color: _border, indent: 16, endIndent: 16),
+          // ── End About & Updates ────────────────────────────
+
           _setting(Icons.help_outline, 'Help & Support', () => _message('Help & Support')),
           _setting(Icons.shield_outlined, 'Privacy & Security', () => _message('Privacy & Security')),
         ],
